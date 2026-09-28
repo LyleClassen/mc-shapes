@@ -14,15 +14,22 @@ import { countBlocks, isFilled, rowCount, trim, trimOffset, type Grid } from "./
 import { getShape, SHAPES } from "./shapes";
 import { defaultValues, resolveValues, type ParamValue, type ParamValues } from "./shapes/types";
 import { colors, fonts } from "./theme/tokens.stylex";
+import { useSessionState } from "./useSessionState";
 
 export function App() {
-  const [shapeId, setShapeId] = useState(SHAPES[0]!.id);
-  const [valuesById, setValuesById] = useState<Record<string, ParamValues>>(() =>
-    Object.fromEntries(SHAPES.map(s => [s.id, defaultValues(s.params)])),
+  const [shapeId, setShapeId] = useSessionState("shapeId", SHAPES[0]!.id, v => SHAPES.some(s => s.id === v));
+  const [valuesById, setValuesById] = useSessionState<Record<string, ParamValues>>(
+    "valuesById",
+    () => Object.fromEntries(SHAPES.map(s => [s.id, defaultValues(s.params)])),
+    isRecord,
   );
-  const [fillInput, setFillInput] = useState<ParamValues>(() => defaultValues(fillParams));
-  const [skinId, setSkinId] = useState(SKINS[0]!.id);
-  const [guideMode, setGuideMode] = useState<GuideMode>("straight");
+  const [fillInput, setFillInput] = useSessionState<ParamValues>("fill", () => defaultValues(fillParams), isRecord);
+  const [skinId, setSkinId] = useSessionState("skinId", SKINS[0]!.id, v => SKINS.some(s => s.id === v));
+  const [guideMode, setGuideMode] = useSessionState<GuideMode>(
+    "guideMode",
+    "straight",
+    v => v === "off" || v === "straight" || v === "shaped",
+  );
   const [hover, setHover] = useState<Cell | null>(null);
   const [listRow, setListRow] = useState<number | null>(null);
   const [done, setDone] = useState<{ plan: string; rows: ReadonlySet<number> }>({ plan: "", rows: new Set() });
@@ -144,6 +151,8 @@ export function App() {
 }
 
 const EMPTY_SET: ReadonlySet<number> = new Set();
+
+const isRecord = (v: unknown) => typeof v === "object" && v !== null && !Array.isArray(v);
 
 function planText(name: string, values: ParamValues, fill: ParamValues, grid: Grid): string {
   const params = Object.entries(values).map(([k, v]) => `${k}=${v}`).join(", ");
