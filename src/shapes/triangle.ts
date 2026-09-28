@@ -1,5 +1,5 @@
 import { rasterConvex, rotateOutline, type Point } from "./raster";
-import { defineShape } from "./types";
+import { defineShape, ROTATION_MARKS } from "./types";
 
 /** Rows needed for an equilateral triangle with the given side, in blocks. */
 export function equilateralHeight(side: number): number {
@@ -33,7 +33,7 @@ export const triangle = defineShape({
       unit: "blocks",
       visible: v => v.kind !== "equilateral",
     },
-    { kind: "number", key: "rotation", label: "Rotation", hint: "Clockwise; 180° points it down", min: 0, max: 359, default: 0, unit: "°" },
+    { kind: "number", key: "rotation", label: "Rotation", hint: "Clockwise; 180° points it down", min: 0, max: 359, default: 0, unit: "°", marks: ROTATION_MARKS },
   ],
   build({ kind, base, height, rotation }) {
     const h = kind === "equilateral" ? equilateralHeight(base) : height;

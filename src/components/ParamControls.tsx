@@ -1,6 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
 import { useId } from "react";
 import {
+  resolveMarks,
   resolveMax,
   type NumberParam,
   type ParamDef,
@@ -52,6 +53,10 @@ function NumberControl({
   const max = resolveMax(param, values);
   const step = param.step ?? 1;
   const set = (v: number) => onChange(Math.min(max, Math.max(param.min, v)));
+  const marks = resolveMarks(param, values);
+  const span = max - param.min;
+  // Dragging near a notch lands on it; the steppers and number box stay exact.
+  const snap = (v: number) => marks.find(m => Math.abs(m.value - v) <= Math.max(step, span / 72))?.value ?? v;
 
   return (
     <div {...stylex.props(styles.field)}>
@@ -64,20 +69,35 @@ function NumberControl({
           {param.unit ? ` ${param.unit}` : ""}
         </span>
       </div>
-      <div {...stylex.props(styles.numberRow)}>
+      <div {...stylex.props(styles.numberRow, marks.length > 0 && styles.numberRowMarked)}>
         <button type="button" aria-label={`Decrease ${param.label}`} onClick={() => set(value - step)} {...stylex.props(styles.stepper)}>
           −
         </button>
-        <input
-          type="range"
-          min={param.min}
-          max={max}
-          step={step}
-          value={value}
-          aria-label={param.label}
-          onChange={e => set(Number(e.target.value))}
-          {...stylex.props(styles.slider)}
-        />
+        <div {...stylex.props(styles.sliderWrap)}>
+          <input
+            type="range"
+            min={param.min}
+            max={max}
+            step={step}
+            value={value}
+            aria-label={param.label}
+            onChange={e => set(snap(Number(e.target.value)))}
+            {...stylex.props(styles.slider)}
+          />
+          {marks.map(m => (
+            <button
+              key={m.value}
+              type="button"
+              tabIndex={-1}
+              aria-hidden
+              onClick={() => set(m.value)}
+              {...stylex.props(styles.mark, styles.markAt(span ? (m.value - param.min) / span : 0))}
+            >
+              <span {...stylex.props(styles.notch, m.value === value && styles.notchOn)} />
+              {m.label && <span {...stylex.props(styles.markLabel)}>{m.label}</span>}
+            </button>
+          ))}
+        </div>
         <button type="button" aria-label={`Increase ${param.label}`} onClick={() => set(value + step)} {...stylex.props(styles.stepper)}>
           +
         </button>
@@ -177,11 +197,50 @@ const styles = stylex.create({
     alignItems: "center",
     gap: 6,
   },
+  numberRowMarked: {
+    paddingBottom: 16,
+  },
+  sliderWrap: {
+    position: "relative",
+    display: "flex",
+    flexGrow: 1,
+    minWidth: 0,
+  },
   slider: {
     flexGrow: 1,
     minWidth: 0,
+    marginInline: 0,
     accentColor: colors.grass,
     cursor: "pointer",
+  },
+  mark: {
+    position: "absolute",
+    top: "100%",
+    transform: "translateX(-50%)",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 2,
+    padding: 0,
+    borderWidth: 0,
+    backgroundColor: "transparent",
+    color: { default: colors.inkFaint, ":hover": colors.ink },
+    cursor: "pointer",
+  },
+  // Offsets by half the native thumb (16px) so a notch sits under the thumb's centre.
+  markAt: (fraction: number) => ({ left: `calc(8px + (100% - 16px) * ${fraction})` }),
+  notch: {
+    width: 2,
+    height: 5,
+    backgroundColor: "currentColor",
+  },
+  notchOn: {
+    backgroundColor: colors.grass,
+  },
+  markLabel: {
+    fontFamily: fonts.mono,
+    fontSize: 9,
+    lineHeight: 1,
   },
   stepper: {
     width: 26,

@@ -17,6 +17,11 @@ export const polygon = defineShape({
       max: v => Math.floor(360 / Number(v.sides)) - 1,
       default: 0,
       unit: "°",
+      // The rotation range is one symmetry period, so mark the flipped orientation.
+      marks: v => {
+        const flip = Math.round(180 / Number(v.sides));
+        return [{ value: 0, label: "0°" }, { value: flip, label: `${flip}°` }];
+      },
     },
   ],
   build({ sides, diameter, rotation }) {

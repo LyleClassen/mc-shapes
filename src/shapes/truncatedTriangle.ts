@@ -1,6 +1,6 @@
 import { lerp, rasterConvex, rotateOutline, type Point } from "./raster";
 import { equilateralHeight } from "./triangle";
-import { defineShape } from "./types";
+import { defineShape, ROTATION_MARKS } from "./types";
 
 export const truncatedTriangle = defineShape({
   id: "truncated-triangle",
@@ -29,7 +29,7 @@ export const truncatedTriangle = defineShape({
       default: 6,
       unit: "blocks",
     },
-    { kind: "number", key: "rotation", label: "Rotation", hint: "Clockwise; 180° points it down", min: 0, max: 359, default: 0, unit: "°" },
+    { kind: "number", key: "rotation", label: "Rotation", hint: "Clockwise; 180° points it down", min: 0, max: 359, default: 0, unit: "°", marks: ROTATION_MARKS },
   ],
   build({ side, corners, cut, rotation }) {
     const turned = rotateOutline(outlineOf(side, corners, cut), rotation, frameOf(side));

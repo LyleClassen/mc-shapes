@@ -20,6 +20,13 @@ export interface NumberParam extends BaseParam {
   step?: number;
   default: number;
   unit?: string;
+  /** Notches on the slider that it snaps to; a function lets them follow other params. */
+  marks?: readonly SliderMark[] | ((values: ParamValues) => readonly SliderMark[]);
+}
+
+export interface SliderMark {
+  value: number;
+  label?: string;
 }
 
 export interface ToggleParam extends BaseParam {
@@ -92,6 +99,19 @@ export function resolveMax(param: NumberParam, values: ParamValues): number {
   const max = typeof param.max === "function" ? param.max(values) : param.max;
   return Math.max(param.min, max);
 }
+
+/** The param's marks that fall inside its current range. */
+export function resolveMarks(param: NumberParam, values: ParamValues): readonly SliderMark[] {
+  const marks = typeof param.marks === "function" ? param.marks(values) : (param.marks ?? []);
+  const max = resolveMax(param, values);
+  return marks.filter(m => m.value >= param.min && m.value <= max);
+}
+
+/** Every 45°, labelled at the quarter turns. */
+export const ROTATION_MARKS: readonly SliderMark[] = Array.from({ length: 8 }, (_, i) => ({
+  value: i * 45,
+  label: i % 2 === 0 ? `${i * 45}°` : undefined,
+}));
 
 export function defaultValues(params: readonly ParamDef[]): ParamValues {
   return Object.fromEntries(params.map(p => [p.key, p.default]));
