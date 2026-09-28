@@ -1,0 +1,36 @@
+/* Page-level basics that StyleX can't target (html/body). Components use StyleX. */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Nunito", ui-rounded, system-ui, sans-serif;
+  color: #fff6df;
+  background-color: #17123d;
+  background-image:
+    radial-gradient(2px 2px at 12% 18%, #fff6df 50%, transparent 51%),
+    radial-gradient(2px 2px at 68% 8%, #cbc2f5 50%, transparent 51%),
+    radial-gradient(2px 2px at 88% 32%, #fff6df 50%, transparent 51%),
+    radial-gradient(2px 2px at 32% 62%, #cbc2f5 50%, transparent 51%),
+    radial-gradient(2px 2px at 52% 88%, #fff6df 50%, transparent 51%),
+    linear-gradient(180deg, #17123d 0%, #221758 60%, #2b1a5e 100%);
+  background-attachment: fixed;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+:focus-visible {
+  outline: 3px solid #ffd23f;
+  outline-offset: 2px;
+}
