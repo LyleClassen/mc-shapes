@@ -10,6 +10,7 @@ import { describeStacks, StatsBar } from "./components/StatsBar";
 import { getSkin, SKINS } from "./render/skins";
 import { applyFill, fillParams } from "./shapes/fill";
 import { centerMarks, effectiveGuideMode, guideCells, guideParam, type GuideMode } from "./shapes/center";
+import { highlight, highlightParam, isHighlightMode, type HighlightMode, type LegendEntry } from "./shapes/patterns";
 import { countBlocks, isFilled, rowCount, trim, trimOffset, type Grid } from "./shapes/grid";
 import { getShape, SHAPES } from "./shapes";
 import { defaultValues, resolveValues, type ParamValue, type ParamValues } from "./shapes/types";
@@ -30,6 +31,8 @@ export function App() {
     "straight",
     v => v === "off" || v === "straight" || v === "shaped",
   );
+  const [highlightMode, setHighlightMode] = useSessionState<HighlightMode>("highlight", "off", isHighlightMode);
+  const [patternColors, setPatternColors] = useSessionState<Record<string, string>>("patternColors", {}, isRecord);
   const [hover, setHover] = useState<Cell | null>(null);
   const [listRow, setListRow] = useState<number | null>(null);
   const [done, setDone] = useState<{ plan: string; rows: ReadonlySet<number> }>({ plan: "", rows: new Set() });
@@ -47,6 +50,13 @@ export function App() {
     // `plan` captures every input to the build.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plan]);
+
+  const traced = useMemo(() => highlight(grid, highlightMode), [grid, highlightMode]);
+  // Custom colours are applied on top so picking one doesn't re-trace the outline.
+  const outline = useMemo(
+    () => traced && { ...traced, legend: traced.legend.map(l => ({ ...l, color: patternColors[l.id] ?? l.color })) },
+    [traced, patternColors],
+  );
 
   const doneRows = done.plan === plan ? done.rows : EMPTY_SET;
   const highlightRow = listRow ?? hover?.y ?? null;
@@ -108,6 +118,23 @@ export function App() {
               values={fill}
               onChange={(key, value) => setFillInput(prev => ({ ...prev, [key]: value }))}
             />
+            <ParamControls
+              params={[highlightParam]}
+              values={{ highlight: highlightMode }}
+              onChange={(_, value) => setHighlightMode(value as HighlightMode)}
+            />
+            {outline && (
+              <PatternLegend
+                legend={outline.legend}
+                customised={outline.legend.some(l => l.id in patternColors)}
+                onPick={(id, color) => setPatternColors(prev => ({ ...prev, [id]: color }))}
+                onReset={() =>
+                  setPatternColors(prev =>
+                    Object.fromEntries(Object.entries(prev).filter(([id]) => !id.startsWith(`${highlightMode}:`))),
+                  )
+                }
+              />
+            )}
             <SkinPicker skins={SKINS} selected={skinId} onSelect={setSkinId} />
           </Panel>
         </aside>
@@ -118,6 +145,7 @@ export function App() {
             grid={grid}
             center={center}
             guides={guideCells(guideMode, center)}
+            highlight={outline}
             skin={getSkin(skinId)}
             highlightRow={highlightRow}
             doneRows={doneRows}
@@ -170,6 +198,48 @@ function planText(name: string, values: ParamValues, fill: ParamValues, grid: Gr
     "",
     ...rows,
   ].join("\n");
+}
+
+/** One chip per colour on the outline: a step length, or step length × group size. Click a chip to recolour it. */
+function PatternLegend({
+  legend,
+  customised,
+  onPick,
+  onReset,
+}: {
+  legend: readonly LegendEntry[];
+  customised: boolean;
+  onPick: (id: string, color: string) => void;
+  onReset: () => void;
+}) {
+  if (!legend.length) return null;
+  return (
+    <div {...stylex.props(styles.legend, styles.patternLegend)}>
+      {legend.map(({ id, label, color }) => (
+        <label key={id} title={`Pick a colour for ${label}`} {...stylex.props(styles.patternChip)} style={{ backgroundColor: color, color: textOn(color) }}>
+          {label}
+          <input
+            type="color"
+            value={color}
+            onChange={e => onPick(id, e.target.value)}
+            {...stylex.props(styles.colorInput)}
+          />
+        </label>
+      ))}
+      {customised && (
+        <button type="button" onClick={onReset} {...stylex.props(styles.resetColors)}>
+          Reset colours
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** Dark text on light chips, white on dark ones. */
+function textOn(hex: string): string {
+  const n = parseInt(hex.slice(1), 16);
+  const lum = (0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255;
+  return lum > 0.45 ? "#0c0924" : "#ffffff";
 }
 
 function CopyButton({ text }: { text: () => string }) {
@@ -301,6 +371,42 @@ const styles = stylex.create({
     margin: 0,
     fontSize: 12,
     color: colors.inkFaint,
+  },
+  patternLegend: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 6,
+  },
+  patternChip: {
+    position: "relative",
+    paddingBlock: 2,
+    paddingInline: 7,
+    borderRadius: 3,
+    boxShadow: { default: `inset 0 -2px 0 rgba(0,0,0,0.3)`, ":hover": `0 0 0 2px ${colors.ink}` },
+    fontFamily: fonts.mono,
+    fontSize: 12,
+    fontWeight: 800,
+    cursor: "pointer",
+  },
+  colorInput: {
+    position: "absolute",
+    inset: 0,
+    width: "100%",
+    height: "100%",
+    opacity: 0,
+    cursor: "pointer",
+  },
+  resetColors: {
+    padding: 0,
+    borderWidth: 0,
+    backgroundColor: "transparent",
+    color: { default: colors.inkFaint, ":hover": colors.ink },
+    fontFamily: fonts.body,
+    fontSize: 12,
+    fontWeight: 700,
+    textDecoration: "underline",
+    cursor: "pointer",
   },
   legendGap: {
     fontFamily: fonts.mono,

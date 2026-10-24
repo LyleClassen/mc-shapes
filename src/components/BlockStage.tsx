@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { drawGrid, MAX_CANVAS_PX } from "../render/drawGrid";
 import type { Skin } from "../render/skins";
 import type { CenterMarks } from "../shapes/center";
+import type { Highlight } from "../shapes/patterns";
 import { isFilled, type Grid, type Span } from "../shapes/grid";
 import { colors, fonts } from "../theme/tokens.stylex";
 
@@ -16,6 +17,8 @@ interface Props {
   center: CenterMarks;
   /** Guide blocks to draw, chosen in the shape panel. */
   guides: readonly { x: number; y: number }[];
+  /** Outline colours chosen in the fill panel. */
+  highlight: Highlight | null;
   skin: Skin;
   highlightRow: number | null;
   doneRows: ReadonlySet<number>;
@@ -27,7 +30,7 @@ const STAGE_PADDING = 24;
 const MAX_PADDING = 16;
 
 /** The zoomable 2D block view, with a toolbar and a hover read-out. */
-export function BlockStage({ grid, center, guides, skin, highlightRow, doneRows, hover, onHover }: Props) {
+export function BlockStage({ grid, center, guides, highlight, skin, highlightRow, doneRows, hover, onHover }: Props) {
   const stageRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stageSize = useElementSize(stageRef);
@@ -50,9 +53,9 @@ export function BlockStage({ grid, center, guides, skin, highlightRow, doneRows,
 
   useLayoutEffect(() => {
     if (canvasRef.current) drawGrid(canvasRef.current, grid, {
-        cell, skin, gridLines, padding, highlightRow, doneRows, center, showCenter, guides,
+        cell, skin, gridLines, padding, highlightRow, doneRows, center, showCenter, guides, highlight,
       });
-  }, [grid, cell, skin, gridLines, padding, highlightRow, doneRows, center, showCenter, guides]);
+  }, [grid, cell, skin, gridLines, padding, highlightRow, doneRows, center, showCenter, guides, highlight]);
 
   const cellAt = (e: React.PointerEvent<HTMLCanvasElement>): Cell | null => {
     const rect = e.currentTarget.getBoundingClientRect();

@@ -1,5 +1,6 @@
 import type { CenterMarks } from "../shapes/center";
 import type { Grid } from "../shapes/grid";
+import type { Highlight } from "../shapes/patterns";
 import type { Skin } from "./skins";
 
 export interface DrawOptions {
@@ -15,6 +16,8 @@ export interface DrawOptions {
   showCenter: boolean;
   /** Guide blocks leading from the shape's walls to its centre; empty for none. */
   guides: readonly { x: number; y: number }[];
+  /** Outline colours from `highlight`; null for none. */
+  highlight: Highlight | null;
 }
 
 const PAD = "#150f40";
@@ -28,6 +31,7 @@ const DONE = "rgba(12, 9, 36, 0.62)";
 const GUIDE = "rgba(255, 210, 63, 0.26)";
 const GUIDE_EDGE = "rgba(255, 210, 63, 0.7)";
 const CENTER_FILL = "rgba(255, 210, 63, 0.42)";
+const MUTED = { face: "#3b3560", light: "#4a4475", dark: "#2b2648", text: "#ffffff" };
 
 /** Largest canvas edge we'll allocate, in device pixels (browsers cap around 16k). */
 export const MAX_CANVAS_PX = 8192;
@@ -64,20 +68,39 @@ export function drawGrid(canvas: HTMLCanvasElement, grid: Grid, o: DrawOptions) 
     }
   }
 
+  // With patterns on, the skin is ignored: outline blocks take their pattern colour
+  // and the rest of the shape fades back.
+  const hl = o.highlight;
+  const shades = hl?.legend.map(({ color }) => skinOf(color));
   const bevel = c >= 8 ? Math.max(1, Math.round(c / 7)) : 0;
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
-      if (!cells[y * w + x]) continue;
+      const i = y * w + x;
+      if (!cells[i]) continue;
+      const key = hl ? hl.keys[i]! : -1;
+      const s = !hl ? o.skin : key < 0 ? MUTED : shades![key]!;
       const px = x * c, py = y * c;
-      ctx.fillStyle = o.skin.face;
+      ctx.fillStyle = s.face;
       ctx.fillRect(px, py, c, c);
       if (!bevel) continue;
-      ctx.fillStyle = o.skin.light;
+      ctx.fillStyle = s.light;
       ctx.fillRect(px, py, c, bevel);
       ctx.fillRect(px, py, bevel, c);
-      ctx.fillStyle = o.skin.dark;
+      ctx.fillStyle = s.dark;
       ctx.fillRect(px, py + c - bevel, c, bevel);
       ctx.fillRect(px + c - bevel, py, bevel, c);
+    }
+  }
+
+  if (hl && c >= 18) {
+    ctx.font = `800 ${Math.round(c * 0.45)}px ui-monospace, Menlo, monospace`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    for (let i = 0; i < hl.steps.length; i++) {
+      const key = hl.keys[i]!;
+      if (key < 0) continue;
+      ctx.fillStyle = shades![key]!.text;
+      ctx.fillText(String(hl.steps[i]), (i % w + 0.5) * c, (Math.floor(i / w) + 0.5) * c);
     }
   }
 
@@ -128,6 +151,30 @@ export function drawGrid(canvas: HTMLCanvasElement, grid: Grid, o: DrawOptions) 
     ctx.lineWidth = stroke;
     ctx.strokeRect(x + stroke / 2, y + stroke / 2, cw - stroke, ch - stroke);
   }
+}
+
+/** A block's bevel and label colours, derived from its face colour. */
+function skinOf(face: string) {
+  const [r, g, b] = rgb(face);
+  const lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+  return {
+    face,
+    light: mix(face, "#ffffff", 0.35),
+    dark: mix(face, "#000000", 0.35),
+    text: lum > 0.45 ? "rgba(12, 9, 36, 0.9)" : "#ffffff",
+  };
+}
+
+function rgb(hex: string): [number, number, number] {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+/** Blends `a` toward `b` by `t`, as a hex colour. */
+function mix(a: string, b: string, t: number): string {
+  const [ar, ag, ab] = rgb(a), [br, bg, bb] = rgb(b);
+  const ch = (x: number, y: number) => Math.round(x + (y - x) * t).toString(16).padStart(2, "0");
+  return `#${ch(ar, br)}${ch(ag, bg)}${ch(ab, bb)}`;
 }
 
 function line(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number, color: string) {
