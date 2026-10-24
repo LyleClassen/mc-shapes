@@ -3,6 +3,7 @@ import { applyFill } from "./fill";
 import { centerGuides, centerSpan, countBlocks, flipHorizontal, hollow, rowCount, rowSegments, trim, type Grid } from "./grid";
 import { SHAPES } from "./index";
 import { circle } from "./circle";
+import { polygon } from "./polygon";
 import { rectangle } from "./rectangle";
 import { triangle } from "./triangle";
 import { truncatedTriangle } from "./truncatedTriangle";
@@ -110,6 +111,52 @@ describe("triangles", () => {
   test("cut is clamped to what the side allows", () => {
     const values = resolveValues(truncatedTriangle.params, { side: 10, cut: 50, corners: "all" });
     expect(values.cut).toBe(4);
+  });
+});
+
+describe("polygon", () => {
+  const size = (values: Record<string, unknown>) => {
+    const grid = build(polygon, values);
+    return [grid.width, grid.height];
+  };
+
+  test("corners: the corner-to-corner span is the diameter, so rotating changes the footprint", () => {
+    expect(size({ sides: 6, diameter: 25, rotation: 0 })).toEqual([21, 25]);
+    expect(size({ sides: 6, diameter: 25, rotation: 30 })).toEqual([25, 21]);
+  });
+
+  test("flats: the flat-to-flat span is the diameter", () => {
+    expect(size({ sides: 6, measure: "flats", diameter: 25, rotation: 0 })[0]).toBe(25);
+    expect(size({ sides: 6, measure: "flats", diameter: 24, rotation: 30 })[1]).toBe(24);
+    expect(size({ sides: 4, measure: "flats", diameter: 20, rotation: 45 })).toEqual([20, 20]);
+  });
+
+  test("flats on an odd polygon run from a corner to the opposite flat", () => {
+    expect(size({ sides: 3, measure: "flats", diameter: 25, rotation: 0 })[1]).toBe(25);
+    expect(size({ sides: 5, measure: "flats", diameter: 30, rotation: 0 })[1]).toBe(30);
+  });
+
+  test("footprint: the widest side is the diameter at every rotation", () => {
+    for (const sides of [3, 4, 5, 6, 8, 12])
+      for (const diameter of [5, 16, 25, 61])
+        for (let rotation = 0; rotation < 360 / sides; rotation += 5) {
+          expect(Math.max(...size({ sides, measure: "footprint", diameter, rotation }))).toBe(diameter);
+        }
+  });
+
+  test("the diameter guide stays inside the grid", () => {
+    for (const measure of ["corners", "flats", "footprint"])
+      for (const sides of [3, 4, 5, 6]) {
+        const values = resolveValues(polygon.params, { sides, measure, diameter: 21, rotation: 10 });
+        const grid = polygon.build(values);
+        for (const line of polygon.center!(values).lines)
+          for (const { x, y } of line) {
+            expect(x).toBeGreaterThanOrEqual(-1e-9);
+            expect(y).toBeGreaterThanOrEqual(-1e-9);
+            expect(x).toBeLessThanOrEqual(grid.width + 1e-9);
+            expect(y).toBeLessThanOrEqual(grid.height + 1e-9);
+          }
+      }
   });
 });
 

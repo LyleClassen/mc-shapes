@@ -1,6 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
 import { useId } from "react";
 import {
+  resolveHint,
   resolveMarks,
   resolveMax,
   type NumberParam,
@@ -32,7 +33,7 @@ export function ParamControls({ params, values, onChange }: Props) {
             case "toggle":
               return <ToggleControl key={p.key} param={p} value={Boolean(values[p.key])} onChange={change} />;
             case "select":
-              return <SelectControl key={p.key} param={p} value={String(values[p.key])} onChange={change} />;
+              return <SelectControl key={p.key} param={p} values={values} onChange={change} />;
           }
         })}
     </div>
@@ -115,9 +116,14 @@ function NumberControl({
           {...stylex.props(styles.numberInput)}
         />
       </div>
-      {param.hint && <p {...stylex.props(styles.hint)}>{param.hint}</p>}
+      <Hint param={param} values={values} />
     </div>
   );
+}
+
+function Hint({ param, values }: { param: ParamDef; values: ParamValues }) {
+  const hint = resolveHint(param, values);
+  return hint ? <p {...stylex.props(styles.hint)}>{hint}</p> : null;
 }
 
 function ToggleControl({ param, value, onChange }: { param: ToggleParam; value: boolean; onChange: (v: boolean) => void }) {
@@ -137,7 +143,16 @@ function ToggleControl({ param, value, onChange }: { param: ToggleParam; value: 
   );
 }
 
-function SelectControl({ param, value, onChange }: { param: SelectParam; value: string; onChange: (v: string) => void }) {
+function SelectControl({
+  param,
+  values,
+  onChange,
+}: {
+  param: SelectParam;
+  values: ParamValues;
+  onChange: (v: string) => void;
+}) {
+  const value = String(values[param.key]);
   return (
     <div {...stylex.props(styles.field)} role="radiogroup" aria-label={param.label}>
       <span {...stylex.props(styles.label)}>{param.label}</span>
@@ -155,6 +170,7 @@ function SelectControl({ param, value, onChange }: { param: SelectParam; value: 
           </button>
         ))}
       </div>
+      <Hint param={param} values={values} />
     </div>
   );
 }

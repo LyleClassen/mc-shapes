@@ -7,7 +7,8 @@ export type ParamValues = Record<string, ParamValue>;
 interface BaseParam {
   key: string;
   label: string;
-  hint?: string;
+  /** A function lets the hint describe the current values. */
+  hint?: string | ((values: ParamValues) => string);
   /** Hide the control when it doesn't apply to the current values. */
   visible?: (values: ParamValues) => boolean;
 }
@@ -98,6 +99,10 @@ export function defineShape<const Ps extends readonly ParamDef[]>(shape: {
 export function resolveMax(param: NumberParam, values: ParamValues): number {
   const max = typeof param.max === "function" ? param.max(values) : param.max;
   return Math.max(param.min, max);
+}
+
+export function resolveHint(param: ParamDef, values: ParamValues): string | undefined {
+  return typeof param.hint === "function" ? param.hint(values) : param.hint;
 }
 
 /** The param's marks that fall inside its current range. */
