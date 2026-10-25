@@ -10,11 +10,13 @@ import { useComposite } from "./useComposite";
 import * as A from "./VariantA";
 import * as B from "./VariantB";
 import * as C from "./VariantC";
+import * as D from "./VariantD";
 
 const VARIANTS = [
   { key: "A", name: A.name },
   { key: "B", name: B.name },
   { key: "C", name: C.name },
+  { key: "D", name: D.name },
 ];
 
 export function CompositePrototype() {
@@ -35,6 +37,7 @@ export function CompositePrototype() {
       {variant === "A" && <A.VariantA api={api} />}
       {variant === "B" && <B.VariantB api={api} />}
       {variant === "C" && <C.VariantC api={api} />}
+      {variant === "D" && <D.VariantD api={api} />}
       <PrototypeSwitcher variants={VARIANTS} current={variant} onChange={change} />
     </>
   );
