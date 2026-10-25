@@ -41,6 +41,22 @@ outline/thickness option, trimming, stats and row guide all come for free.
 - Helpers: `gridFrom` (sample cell centres), `rasterConvex` (convex polygons),
   `flipVertical`/`flipHorizontal`.
 
+## Composite mode
+
+The header's **Shapes | Composite** switch opens a layered editor that builds
+one block plan from several live layers: shapes dragged in from the palette,
+lines and eraser strokes. Each layer sees only the layers below it, and the
+visible ones flatten into the same stats bar, row guide, skins and highlight
+as a single shape. The terms are defined in [GLOSSARY.md](GLOSSARY.md).
+
+- [src/composite/](src/composite/): the pure engine (`composite.ts` flattens,
+  `draw.ts` holds the line, brush and rectangle geometry), layer edits and
+  picking (`edit.ts`), the undo history (`history.ts`), and the editor state
+  hook (`useComposite.ts`). The composite is kept in sessionStorage, but the
+  undo history is in memory only.
+- [src/components/composite/](src/components/composite/): the toolbar,
+  stage, layer settings and Layers panel.
+
 ## Styling
 
 Styles use [StyleX](https://stylexjs.com), compiled by the Bun plugin in

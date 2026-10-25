@@ -1,8 +1,10 @@
 import * as stylex from "@stylexjs/stylex";
 import { useCallback, useMemo, useState } from "react";
 import { BlockStage, type Cell } from "./components/BlockStage";
+import { CompositeMode } from "./components/composite/CompositeMode";
 import { Panel } from "./components/Panel";
 import { ParamControls } from "./components/ParamControls";
+import { PatternLegend, recolour } from "./components/PatternLegend";
 import { RowGuide } from "./components/RowGuide";
 import { ShapePicker } from "./components/ShapePicker";
 import { SkinPicker } from "./components/SkinPicker";
@@ -10,14 +12,17 @@ import { describeStacks, StatsBar } from "./components/StatsBar";
 import { getSkin, SKINS } from "./render/skins";
 import { applyFill, fillParams } from "./shapes/fill";
 import { centerMarks, effectiveGuideMode, guideCells, guideParam, type GuideMode } from "./shapes/center";
-import { highlight, highlightParam, isHighlightMode, type HighlightMode, type LegendEntry } from "./shapes/patterns";
+import { highlight, highlightParam, isHighlightMode, type HighlightMode } from "./shapes/patterns";
 import { countBlocks, isFilled, rowCount, trim, trimOffset, type Grid } from "./shapes/grid";
 import { getShape, SHAPES } from "./shapes";
 import { defaultValues, resolveValues, type ParamValue, type ParamValues } from "./shapes/types";
 import { colors, fonts } from "./theme/tokens.stylex";
 import { useSessionState } from "./useSessionState";
 
+type Mode = "shapes" | "composite";
+
 export function App() {
+  const [mode, setMode] = useSessionState<Mode>("mode", "shapes", v => v === "shapes" || v === "composite");
   const [shapeId, setShapeId] = useSessionState("shapeId", SHAPES[0]!.id, v => SHAPES.some(s => s.id === v));
   const [valuesById, setValuesById] = useSessionState<Record<string, ParamValues>>(
     "valuesById",
@@ -52,11 +57,7 @@ export function App() {
   }, [plan]);
 
   const traced = useMemo(() => highlight(grid, highlightMode), [grid, highlightMode]);
-  // Custom colours are applied on top so picking one doesn't re-trace the outline.
-  const outline = useMemo(
-    () => traced && { ...traced, legend: traced.legend.map(l => ({ ...l, color: patternColors[l.id] ?? l.color })) },
-    [traced, patternColors],
-  );
+  const outline = useMemo(() => recolour(traced, patternColors), [traced, patternColors]);
 
   const doneRows = done.plan === plan ? done.rows : EMPTY_SET;
   const highlightRow = listRow ?? hover?.y ?? null;
@@ -89,91 +90,104 @@ export function App() {
           <h1 {...stylex.props(styles.title)}>Shape Crafter</h1>
           <p {...stylex.props(styles.tagline)}>Plan circles, triangles and more — block by block.</p>
         </div>
+        <div role="tablist" aria-label="Mode" {...stylex.props(styles.modes)}>
+          {(["shapes", "composite"] as const).map(m => (
+            <button
+              key={m}
+              type="button"
+              role="tab"
+              aria-selected={mode === m}
+              onClick={() => setMode(m)}
+              {...stylex.props(styles.mode, mode === m && styles.modeOn)}
+            >
+              {m === "shapes" ? "Shapes" : "Composite"}
+            </button>
+          ))}
+        </div>
       </header>
 
-      <main {...stylex.props(styles.layout)}>
-        <aside {...stylex.props(styles.sidebar)}>
-          <Panel title="Shape" accent="grass">
-            <ShapePicker shapes={SHAPES} selected={shapeId} onSelect={setShapeId} />
-          </Panel>
+      {/* Kept mounted so the composite's undo history survives a trip to Shapes mode. */}
+      <div hidden={mode !== "composite"}>
+        <CompositeMode
+          active={mode === "composite"}
+          view={{ skinId, setSkinId, highlightMode, setHighlightMode, patternColors, setPatternColors }}
+        />
+      </div>
 
-          <Panel title={shape.name} accent="gold">
-            <p {...stylex.props(styles.description)}>{shape.description}</p>
-            <ParamControls params={shape.params} values={values} onChange={setParam} />
-            <ParamControls
-              params={[guideParam(center)]}
-              values={{ guides: effectiveGuideMode(guideMode, center) }}
-              onChange={(_, value) => setGuideMode(value as GuideMode)}
-            />
-            {shape.tip && (
-              <p {...stylex.props(styles.tip)}>
-                <b {...stylex.props(styles.tipLabel)}>Tip</b> {shape.tip}
-              </p>
-            )}
-          </Panel>
+      {mode === "shapes" && (
+        <main {...stylex.props(styles.layout)}>
+          <aside {...stylex.props(styles.sidebar)}>
+            <Panel title="Shape" accent="grass">
+              <ShapePicker shapes={SHAPES} selected={shapeId} onSelect={setShapeId} />
+            </Panel>
 
-          <Panel title="Fill & block" accent="amethyst">
-            <ParamControls
-              params={fillParams}
-              values={fill}
-              onChange={(key, value) => setFillInput(prev => ({ ...prev, [key]: value }))}
-            />
-            <ParamControls
-              params={[highlightParam]}
-              values={{ highlight: highlightMode }}
-              onChange={(_, value) => setHighlightMode(value as HighlightMode)}
-            />
-            {outline && (
-              <PatternLegend
-                legend={outline.legend}
-                customised={outline.legend.some(l => l.id in patternColors)}
-                onPick={(id, color) => setPatternColors(prev => ({ ...prev, [id]: color }))}
-                onReset={() =>
-                  setPatternColors(prev =>
-                    Object.fromEntries(Object.entries(prev).filter(([id]) => !id.startsWith(`${highlightMode}:`))),
-                  )
-                }
+            <Panel title={shape.name} accent="gold">
+              <p {...stylex.props(styles.description)}>{shape.description}</p>
+              <ParamControls params={shape.params} values={values} onChange={setParam} />
+              <ParamControls
+                params={[guideParam(center)]}
+                values={{ guides: effectiveGuideMode(guideMode, center) }}
+                onChange={(_, value) => setGuideMode(value as GuideMode)}
               />
-            )}
-            <SkinPicker skins={SKINS} selected={skinId} onSelect={setSkinId} />
+              {shape.tip && (
+                <p {...stylex.props(styles.tip)}>
+                  <b {...stylex.props(styles.tipLabel)}>Tip</b> {shape.tip}
+                </p>
+              )}
+            </Panel>
+
+            <Panel title="Fill & block" accent="amethyst">
+              <ParamControls
+                params={fillParams}
+                values={fill}
+                onChange={(key, value) => setFillInput(prev => ({ ...prev, [key]: value }))}
+              />
+              <ParamControls
+                params={[highlightParam]}
+                values={{ highlight: highlightMode }}
+                onChange={(_, value) => setHighlightMode(value as HighlightMode)}
+              />
+              <PatternLegend highlight={outline} mode={highlightMode} custom={patternColors} onChange={setPatternColors} />
+              <SkinPicker skins={SKINS} selected={skinId} onSelect={setSkinId} />
+            </Panel>
+          </aside>
+
+          <section {...stylex.props(styles.center)}>
+            <StatsBar blocks={blocks} solidBlocks={countBlocks(solid)} width={grid.width} height={grid.height} />
+            <BlockStage
+              grid={grid}
+              center={center}
+              guides={guideCells(guideMode, center)}
+              highlight={outline}
+              skin={getSkin(skinId)}
+              highlightRow={highlightRow}
+              doneRows={doneRows}
+              hover={hover}
+              onHover={setHover}
+            />
+          </section>
+
+          <Panel
+            title="Row guide"
+            accent="diamond"
+            xstyle={styles.rows}
+            action={<CopyButton text={() => planText(shape.name, values, fill, grid)} />}
+          >
+            <p {...stylex.props(styles.legend)}>
+              <span {...stylex.props(styles.legendGap)}>·4</span> skip 4 ·{" "}
+              <span {...stylex.props(styles.legendFill)}>3</span> place 3 · click a row to tick it off
+              {doneRows.size > 0 && ` · ${doneRows.size}/${grid.height} done`}
+            </p>
+            <RowGuide
+              grid={grid}
+              highlightRow={highlightRow}
+              doneRows={doneRows}
+              onHoverRow={setListRow}
+              onToggleRow={toggleRow}
+            />
           </Panel>
-        </aside>
-
-        <section {...stylex.props(styles.center)}>
-          <StatsBar blocks={blocks} solidBlocks={countBlocks(solid)} width={grid.width} height={grid.height} />
-          <BlockStage
-            grid={grid}
-            center={center}
-            guides={guideCells(guideMode, center)}
-            highlight={outline}
-            skin={getSkin(skinId)}
-            highlightRow={highlightRow}
-            doneRows={doneRows}
-            hover={hover}
-            onHover={setHover}
-          />
-        </section>
-
-        <Panel
-          title="Row guide"
-          accent="diamond"
-          xstyle={styles.rows}
-          action={<CopyButton text={() => planText(shape.name, values, fill, grid)} />}
-        >
-          <p {...stylex.props(styles.legend)}>
-            <span {...stylex.props(styles.legendGap)}>·4</span> skip 4 ·{" "}
-            <span {...stylex.props(styles.legendFill)}>3</span> place 3 · click a row to tick it off
-            {doneRows.size > 0 && ` · ${doneRows.size}/${grid.height} done`}
-          </p>
-          <RowGuide
-            grid={grid}
-            highlightRow={highlightRow}
-            doneRows={doneRows}
-            onHoverRow={setListRow}
-            onToggleRow={toggleRow}
-          />
-        </Panel>
-      </main>
+        </main>
+      )}
     </div>
   );
 }
@@ -198,48 +212,6 @@ function planText(name: string, values: ParamValues, fill: ParamValues, grid: Gr
     "",
     ...rows,
   ].join("\n");
-}
-
-/** One chip per colour on the outline: a step length, or step length × group size. Click a chip to recolour it. */
-function PatternLegend({
-  legend,
-  customised,
-  onPick,
-  onReset,
-}: {
-  legend: readonly LegendEntry[];
-  customised: boolean;
-  onPick: (id: string, color: string) => void;
-  onReset: () => void;
-}) {
-  if (!legend.length) return null;
-  return (
-    <div {...stylex.props(styles.legend, styles.patternLegend)}>
-      {legend.map(({ id, label, color }) => (
-        <label key={id} title={`Pick a colour for ${label}`} {...stylex.props(styles.patternChip)} style={{ backgroundColor: color, color: textOn(color) }}>
-          {label}
-          <input
-            type="color"
-            value={color}
-            onChange={e => onPick(id, e.target.value)}
-            {...stylex.props(styles.colorInput)}
-          />
-        </label>
-      ))}
-      {customised && (
-        <button type="button" onClick={onReset} {...stylex.props(styles.resetColors)}>
-          Reset colours
-        </button>
-      )}
-    </div>
-  );
-}
-
-/** Dark text on light chips, white on dark ones. */
-function textOn(hex: string): string {
-  const n = parseInt(hex.slice(1), 16);
-  const lum = (0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255;
-  return lum > 0.45 ? "#0c0924" : "#ffffff";
 }
 
 function CopyButton({ text }: { text: () => string }) {
@@ -281,7 +253,34 @@ const styles = stylex.create({
   header: {
     display: "flex",
     alignItems: "center",
+    flexWrap: "wrap",
     gap: 18,
+  },
+  modes: {
+    marginLeft: "auto",
+    display: "flex",
+    gap: 4,
+    padding: 4,
+    borderRadius: 6,
+    borderWidth: 3,
+    borderStyle: "solid",
+    borderColor: colors.line,
+    backgroundColor: colors.panelSunk,
+  },
+  mode: {
+    paddingBlock: 9,
+    paddingInline: { default: 16, [PHONE]: 10 },
+    borderWidth: 0,
+    borderRadius: 3,
+    backgroundColor: { default: "transparent", ":hover": colors.panelRaised },
+    color: colors.inkSoft,
+    fontFamily: fonts.pixel,
+    fontSize: { default: 10, [PHONE]: 8 },
+    cursor: "pointer",
+  },
+  modeOn: {
+    backgroundColor: { default: colors.gold, ":hover": colors.gold },
+    color: colors.skyDeep,
   },
   logo: {
     display: "flex",
@@ -371,42 +370,6 @@ const styles = stylex.create({
     margin: 0,
     fontSize: 12,
     color: colors.inkFaint,
-  },
-  patternLegend: {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: 6,
-  },
-  patternChip: {
-    position: "relative",
-    paddingBlock: 2,
-    paddingInline: 7,
-    borderRadius: 3,
-    boxShadow: { default: `inset 0 -2px 0 rgba(0,0,0,0.3)`, ":hover": `0 0 0 2px ${colors.ink}` },
-    fontFamily: fonts.mono,
-    fontSize: 12,
-    fontWeight: 800,
-    cursor: "pointer",
-  },
-  colorInput: {
-    position: "absolute",
-    inset: 0,
-    width: "100%",
-    height: "100%",
-    opacity: 0,
-    cursor: "pointer",
-  },
-  resetColors: {
-    padding: 0,
-    borderWidth: 0,
-    backgroundColor: "transparent",
-    color: { default: colors.inkFaint, ":hover": colors.ink },
-    fontFamily: fonts.body,
-    fontSize: 12,
-    fontWeight: 700,
-    textDecoration: "underline",
-    cursor: "pointer",
   },
   legendGap: {
     fontFamily: fonts.mono,

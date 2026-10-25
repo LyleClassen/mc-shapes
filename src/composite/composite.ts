@@ -63,11 +63,30 @@ export function resizeCanvas(composite: Composite, size: Canvas): Composite {
   return { ...composite, canvas: { width: side(size.width), height: side(size.height) } };
 }
 
-/** The shape's trimmed blocks, with Fill worked out on the shape alone. */
+const SHAPE_CACHE_SIZE = 64;
+const shapeCache = new Map<string, Grid>();
+
+/**
+ * The shape's trimmed blocks, with Fill worked out on the shape alone.
+ * Cached by shape and values, since dragging a layer re-flattens on every
+ * move while its blocks stay the same. Callers must not mutate the grid.
+ */
 export function shapeGrid(shapeId: string, values: ParamValues): Grid {
   const shape = getShape(shapeId);
-  const solid = trim(shape.build(resolveValues(shape.params, values)));
-  return trim(applyFill(solid, resolveValues(fillParams, values)));
+  const params = resolveValues(shape.params, values);
+  const fill = resolveValues(fillParams, values);
+  const key = JSON.stringify([shape.id, params, fill]);
+  const cached = shapeCache.get(key);
+  if (cached) {
+    // Refresh its place so the least recently used shape is the one dropped.
+    shapeCache.delete(key);
+    shapeCache.set(key, cached);
+    return cached;
+  }
+  const grid = trim(applyFill(trim(shape.build(params)), fill));
+  shapeCache.set(key, grid);
+  if (shapeCache.size > SHAPE_CACHE_SIZE) shapeCache.delete(shapeCache.keys().next().value!);
+  return grid;
 }
 
 /** Top-left and bottom-right of the points, which must not be empty. Loops, as an eraser can hold too many cells to spread. */
@@ -120,6 +139,8 @@ export interface Flattened {
   grid: Grid;
   /** Canvas x/y of the plan's top-left cell. */
   origin: Point;
+  /** The whole canvas, untrimmed, for drawing the stage. */
+  canvas: Grid;
 }
 
 /**
@@ -135,7 +156,7 @@ export function flatten({ canvas, layers }: Composite): Flattened {
     forEachOnCanvas(layer, canvas, i => (cells[i] = value));
   }
   const full: Grid = { width: canvas.width, height: canvas.height, cells };
-  return { grid: trim(full), origin: trimOffset(full) };
+  return { grid: trim(full), origin: trimOffset(full), canvas: full };
 }
 
 /** True when none of the layer's cells land on the canvas. Such a layer is kept, but warned about. */

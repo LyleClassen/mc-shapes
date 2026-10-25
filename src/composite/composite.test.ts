@@ -104,6 +104,12 @@ describe("shape layers", () => {
     expect(countBlocks(shapeGrid("rectangle", { width: 5, height: 4, fill: "hollow", thickness: 1 }))).toBe(14);
   });
 
+  test("the same shape and values reuse one grid; other values build their own", () => {
+    const a = shapeGrid("rectangle", { width: 7, height: 3 });
+    expect(shapeGrid("rectangle", { width: 7, height: 3, fill: "solid" })).toBe(a);
+    expect(shapeGrid("rectangle", { width: 7, height: 4 })).not.toBe(a);
+  });
+
   test("an outline can sit on a solid shape", () => {
     const { grid } = flatten(small([rect(0, 0, 6, 6), rect(2, 2, 6, 6, { fill: "hollow", thickness: 1 })]));
     expect(grid.width).toBe(8);
