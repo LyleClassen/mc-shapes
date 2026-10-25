@@ -11,7 +11,7 @@ import { trim, trimOffset, type Grid } from "../shapes/grid";
 import { getShape, SHAPES } from "../shapes";
 import { defaultValues, resolveValues, type ParamDef } from "../shapes/types";
 import { colors, fonts } from "../theme/tokens.stylex";
-import { flatten, isOffCanvas, moveBy, position, type Composite, type Layer } from "./engine";
+import { flatten, isOffCanvas, moveBy, placed, position, type Composite, type Layer } from "./engine";
 import type { CompositeApi } from "./useComposite";
 
 export function LayerSettings({ api, layer, compact }: { api: CompositeApi; layer: Layer; compact?: boolean }) {
@@ -37,6 +37,18 @@ export function LayerSettings({ api, layer, compact }: { api: CompositeApi; laye
         <Num label="x" value={pos.x} onChange={v => set(l => moveBy(l, v - pos.x, 0), "x")} />
         <Num label="y" value={pos.y} onChange={v => set(l => moveBy(l, 0, v - pos.y), "y")} />
         {off && <span {...stylex.props(styles.warn)}>Off canvas</span>}
+      </div>
+
+      <div {...stylex.props(styles.row)}>
+        <button type="button" title="Centre on the canvas" onClick={() => set(l => centreOn(api.composite, l, true, true))} {...stylex.props(styles.btn)}>
+          ✛ Centre
+        </button>
+        <button type="button" title="Centre horizontally" onClick={() => set(l => centreOn(api.composite, l, true, false))} {...stylex.props(styles.btn)}>
+          ⇔ Horizontally
+        </button>
+        <button type="button" title="Centre vertically" onClick={() => set(l => centreOn(api.composite, l, false, true))} {...stylex.props(styles.btn)}>
+          ⇕ Vertically
+        </button>
       </div>
 
       {layer.kind === "shape" && (
@@ -100,6 +112,14 @@ export function LayerSettings({ api, layer, compact }: { api: CompositeApi; laye
       </div>
     </div>
   );
+}
+
+/** Centres the layer's blocks on the canvas along either axis, rounding down like a new shape does. */
+function centreOn(c: Composite, l: Layer, h: boolean, v: boolean): Layer {
+  const { grid, x, y } = placed(l);
+  const dx = h ? Math.floor((c.width - grid.width) / 2) - x : 0;
+  const dy = v ? Math.floor((c.height - grid.height) / 2) - y : 0;
+  return moveBy(l, dx, dy);
 }
 
 export function CanvasSize({ api }: { api: CompositeApi }) {
