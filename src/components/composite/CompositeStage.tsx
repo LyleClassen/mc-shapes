@@ -359,6 +359,12 @@ export function CompositeStage({ api, canvas, skin, highlight, highlightRow, don
             {...stylex.props(styles.over, tool === "move" ? styles.moveCursor : styles.drawCursor)}
           />
         </div>
+        {!composite.layers.length && (
+          <div {...stylex.props(styles.empty)}>
+            <b {...stylex.props(styles.emptyTitle)}>Drag a shape here to start</b>
+            <span>Pick one from the bar above and drop it onto the canvas. Then draw lines or erase on top.</span>
+          </div>
+        )}
         {api.notice && (
           <div role="status" {...stylex.props(styles.notice)}>
             {api.notice}
@@ -479,6 +485,29 @@ const styles = stylex.create({
     fontWeight: 800,
     pointerEvents: "none",
   },
+  empty: {
+    position: "absolute",
+    top: "50%",
+    left: "50%",
+    transform: "translate(-50%, -50%)",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 8,
+    maxWidth: 320,
+    paddingBlock: 16,
+    paddingInline: 20,
+    borderWidth: 2,
+    borderStyle: "dashed",
+    borderColor: colors.grass,
+    borderRadius: 6,
+    backgroundColor: "rgba(12, 9, 36, 0.8)",
+    color: colors.inkSoft,
+    fontSize: 13,
+    textAlign: "center",
+    pointerEvents: "none",
+  },
+  emptyTitle: { fontFamily: fonts.pixel, fontSize: 11, lineHeight: 1.5, color: colors.grass },
   readout: { display: "flex", flexWrap: "wrap", gap: 16, minHeight: 22, fontSize: 13, color: colors.inkFaint },
   em: { fontFamily: fonts.mono, color: colors.gold },
 });

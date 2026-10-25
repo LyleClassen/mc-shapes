@@ -50,22 +50,26 @@ export function CompositeToolbar({ api }: { api: CompositeApi }) {
 
       <span {...stylex.props(styles.divider)} />
 
-      <div {...stylex.props(styles.palette)}>
-        {palette.map(({ shape, layer }) => (
-          <span
-            key={shape.id}
-            draggable
-            title={`Drag a ${shape.name.toLowerCase()} onto the canvas`}
-            onDragStart={e => {
-              e.dataTransfer.setData(SHAPE_TYPE, shape.id);
-              e.dataTransfer.effectAllowed = "copy";
-            }}
-            {...stylex.props(styles.tile)}
-          >
-            <LayerThumb layer={layer} size={26} />
-            {shape.name}
-          </span>
-        ))}
+      <div {...stylex.props(styles.paletteGroup)}>
+        <span {...stylex.props(styles.caption)}>Drag a shape onto the canvas ↓</span>
+        <div {...stylex.props(styles.palette)}>
+          {palette.map(({ shape, layer }) => (
+            <span
+              key={shape.id}
+              draggable
+              title={`Drag a ${shape.name.toLowerCase()} onto the canvas`}
+              onDragStart={e => {
+                e.dataTransfer.setData(SHAPE_TYPE, shape.id);
+                e.dataTransfer.effectAllowed = "copy";
+              }}
+              onClick={() => api.say(`Drag the ${shape.name.toLowerCase()} onto the canvas to place it`)}
+              {...stylex.props(styles.tile)}
+            >
+              <LayerThumb layer={layer} size={26} />
+              {shape.name}
+            </span>
+          ))}
+        </div>
       </div>
 
       <span {...stylex.props(ui.grow)} />
@@ -160,6 +164,8 @@ const styles = stylex.create({
   toolOn: { borderColor: colors.gold, color: colors.gold, backgroundColor: colors.panelRaised },
   glyph: { fontSize: 17, lineHeight: 1 },
   divider: { width: 2, alignSelf: "stretch", backgroundColor: colors.line },
+  paletteGroup: { display: "flex", flexDirection: "column", gap: 4 },
+  caption: { fontSize: 11, fontWeight: 800, color: colors.grass },
   palette: { display: "flex", flexWrap: "wrap", gap: 4 },
   tile: {
     display: "flex",
