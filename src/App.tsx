@@ -16,8 +16,11 @@ import { getShape, SHAPES } from "./shapes";
 import { defaultValues, resolveValues, type ParamValue, type ParamValues } from "./shapes/types";
 import { colors, fonts } from "./theme/tokens.stylex";
 import { useSessionState } from "./useSessionState";
+import { CompositePrototype } from "./composite-prototype";
 
 export function App() {
+  // PROTOTYPE: the Shapes | Composite switch for "Composite mode layout and interaction".
+  const [mode, setMode] = useSessionState<"shapes" | "composite">("mode", "shapes", v => v === "shapes" || v === "composite");
   const [shapeId, setShapeId] = useSessionState("shapeId", SHAPES[0]!.id, v => SHAPES.some(s => s.id === v));
   const [valuesById, setValuesById] = useSessionState<Record<string, ParamValues>>(
     "valuesById",
@@ -89,9 +92,28 @@ export function App() {
           <h1 {...stylex.props(styles.title)}>Shape Crafter</h1>
           <p {...stylex.props(styles.tagline)}>Plan circles, triangles and more — block by block.</p>
         </div>
+        <div {...stylex.props(styles.modes)} role="tablist" aria-label="Mode">
+          {(["shapes", "composite"] as const).map(m => (
+            <button
+              key={m}
+              type="button"
+              role="tab"
+              aria-selected={mode === m}
+              onClick={() => setMode(m)}
+              {...stylex.props(styles.mode, mode === m && styles.modeOn)}
+            >
+              {m === "shapes" ? "Shapes" : "Composite"}
+            </button>
+          ))}
+        </div>
       </header>
 
-      <main {...stylex.props(styles.layout)}>
+      {/* Kept mounted so the composite survives a trip to Shapes mode. */}
+      <div style={{ display: mode === "composite" ? undefined : "none" }}>
+        <CompositePrototype />
+      </div>
+
+      {mode === "shapes" && <main {...stylex.props(styles.layout)}>
         <aside {...stylex.props(styles.sidebar)}>
           <Panel title="Shape" accent="grass">
             <ShapePicker shapes={SHAPES} selected={shapeId} onSelect={setShapeId} />
@@ -173,7 +195,7 @@ export function App() {
             onToggleRow={toggleRow}
           />
         </Panel>
-      </main>
+      </main>}
     </div>
   );
 }
@@ -282,6 +304,32 @@ const styles = stylex.create({
     display: "flex",
     alignItems: "center",
     gap: 18,
+  },
+  modes: {
+    marginLeft: "auto",
+    display: "flex",
+    padding: 4,
+    gap: 4,
+    borderRadius: 6,
+    borderWidth: 3,
+    borderStyle: "solid",
+    borderColor: colors.line,
+    backgroundColor: colors.panelSunk,
+  },
+  mode: {
+    paddingBlock: 8,
+    paddingInline: 16,
+    borderWidth: 0,
+    borderRadius: 3,
+    backgroundColor: { default: "transparent", ":hover": colors.panelRaised },
+    color: colors.inkSoft,
+    fontFamily: fonts.pixel,
+    fontSize: 10,
+    cursor: "pointer",
+  },
+  modeOn: {
+    backgroundColor: { default: colors.gold, ":hover": colors.gold },
+    color: colors.skyDeep,
   },
   logo: {
     display: "flex",
