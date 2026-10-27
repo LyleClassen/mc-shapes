@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSessionState } from "../useSessionState";
 import { duplicateLayer, EMPTY_COMPOSITE, resizeCanvas, type Canvas, type Composite, type Layer } from "./composite";
-import { insertLayer, neighbourOf, removeLayer, reorderLayer } from "./edit";
+import { fitCanvas, insertLayer, neighbourOf, removeLayer, reorderLayer } from "./edit";
 import { EMPTY_HISTORY, record, redo, seal, selectionAfter, undo, type History, type Travel } from "./history";
 
 export type Tool = "move" | "line" | "eraser";
@@ -141,6 +141,8 @@ export function useComposite(active: boolean) {
 
   const resize = (size: Canvas, merge: string) => edit(c => resizeCanvas(c, size), null, `canvas:${merge}`);
 
+  const fitToLayers = () => edit(fitCanvas, null);
+
   return {
     composite,
     selected,
@@ -164,6 +166,7 @@ export function useComposite(active: boolean) {
     duplicate,
     reorder,
     resize,
+    fitToLayers,
     notice,
     say,
     flashId,

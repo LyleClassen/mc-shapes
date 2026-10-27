@@ -4,6 +4,7 @@ import { newEraserLayer, newLineLayer, type Composite, type Layer } from "./comp
 import {
   centreLayer,
   describeLayer,
+  fitCanvas,
   insertLayer,
   layerBox,
   moveLayer,
@@ -81,6 +82,34 @@ describe("moving and centring", () => {
     const l = line("l", { x: 0, y: 0 }, { x: 3, y: 0 });
     expect(centreLayer(l, canvas, true, true)).toMatchObject({ x: 6, y: 7 });
     expect(layerBox(l)).toEqual({ x: 0, y: 0, width: 4, height: 1 });
+  });
+});
+
+describe("fitCanvas", () => {
+  const pos = (l: Layer) => [l.x, l.y];
+
+  test("sizes the canvas to every layer and moves them to its top-left, hidden ones included", () => {
+    const fit = fitCanvas(small([rect("a", -5, -3, 4, 4), { ...rect("b", 14, 10, 6, 2), visible: false }]));
+    expect(fit.canvas).toEqual({ width: 25, height: 15 });
+    expect(fit.layers.map(pos)).toEqual([[0, 0], [19, 13]]);
+  });
+
+  test("erasers move along but don't count towards the size", () => {
+    const fit = fitCanvas(small([rect("a", 2, 2, 10, 10), eraser("e", [{ x: 14, y: 14 }])]));
+    expect(fit.canvas).toEqual({ width: 10, height: 10 });
+    expect(fit.layers.map(pos)).toEqual([[0, 0], [12, 12]]);
+  });
+
+  test("a layer smaller than the minimum canvas is centred on it", () => {
+    const fit = fitCanvas(small([rect("a", 5, 5, 3, 2)]));
+    expect(fit.canvas).toEqual({ width: 8, height: 8 });
+    expect(fit.layers.map(pos)).toEqual([[2, 3]]);
+  });
+
+  test("nothing to fit leaves it alone", () => {
+    const c = small([eraser("e", [{ x: 1, y: 1 }])]);
+    expect(fitCanvas(c)).toBe(c);
+    expect(fitCanvas(small([]))).toEqual(small([]));
   });
 });
 

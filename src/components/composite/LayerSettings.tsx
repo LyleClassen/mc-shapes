@@ -1,4 +1,4 @@
-import { CrosshairIcon, MoveHorizontalIcon, MoveVerticalIcon } from "lucide-react";
+import { CrosshairIcon, MoveHorizontalIcon, MoveVerticalIcon, ScanIcon } from "lucide-react";
 import {
   CANVAS_MAX,
   CANVAS_MIN,
@@ -220,14 +220,17 @@ export function CanvasSettings({ api }: { api: CompositeApi }) {
           onChange={height => api.resize({ ...canvas, height }, "height")}
         />
       </div>
+      <Button
+        className="self-start"
+        disabled={!api.composite.layers.some(l => l.kind !== "eraser")}
+        onClick={api.fitToLayers}
+      >
+        <ScanIcon />
+        Fit to layers
+      </Button>
       <FieldDescription>
         {CANVAS_MIN}–{CANVAS_MAX} blocks a side. Resizing keeps the top-left fixed; blocks pushed off the edge come
-        back if you make it bigger again.
-      </FieldDescription>
-      <FieldDescription>
-        {api.composite.layers.length
-          ? "Select a layer in the Layers panel, or Ctrl-click it on the canvas, to edit it."
-          : "Drag a shape from the bar above onto the canvas to start."}
+        back if you make it bigger again. Fit to layers shrinks or grows the canvas to just hold every layer.
       </FieldDescription>
     </div>
   );

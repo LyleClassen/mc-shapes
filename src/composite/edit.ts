@@ -3,9 +3,11 @@ import { isFilled } from "../shapes/grid";
 import type { Point } from "../shapes/raster";
 import { resolveValues, type ParamValues } from "../shapes/types";
 import {
+  CANVAS_MIN,
   centredPosition,
   layerGrid,
   lineEndpoints,
+  resizeCanvas,
   type Canvas,
   type Composite,
   type ImageLayer,
@@ -88,6 +90,24 @@ export interface Box {
 export function layerBox(layer: Layer): Box | null {
   const grid = layerGrid(layer);
   return grid.width ? { x: layer.x, y: layer.y, width: grid.width, height: grid.height } : null;
+}
+
+/**
+ * Sizes the canvas to the box around every layer's blocks, hidden ones too,
+ * and moves all the layers so that box starts at the canvas's top-left. Erasers
+ * only remove blocks, so they move along but don't count towards the box. A box
+ * smaller than the minimum canvas is centred on it.
+ */
+export function fitCanvas(composite: Composite): Composite {
+  const boxes = composite.layers.flatMap(l => (l.kind === "eraser" ? [] : (layerBox(l) ?? [])));
+  if (!boxes.length) return composite;
+  const left = Math.min(...boxes.map(b => b.x)), top = Math.min(...boxes.map(b => b.y));
+  const width = Math.max(...boxes.map(b => b.x + b.width)) - left;
+  const height = Math.max(...boxes.map(b => b.y + b.height)) - top;
+  const dx = Math.max(0, Math.floor((CANVAS_MIN - width) / 2)) - left;
+  const dy = Math.max(0, Math.floor((CANVAS_MIN - height) / 2)) - top;
+  const layers = composite.layers.map(l => moveLayer(l, l.x + dx, l.y + dy));
+  return resizeCanvas({ ...composite, layers }, { width, height });
 }
 
 /**

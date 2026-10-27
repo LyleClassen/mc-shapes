@@ -20,6 +20,7 @@ import { LayerSettings, CanvasSettings } from "./LayerSettings";
 import { LayersPanel } from "./LayersPanel";
 import { Card } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { FieldDescription } from "@/components/ui/field";
 
 /** View settings shared with Shapes mode. None of them are undoable. */
 export interface SharedView {
@@ -34,7 +35,7 @@ export interface SharedView {
 /**
  * Composite mode: tools and the shape palette on top, the selected layer's
  * settings on the left, the stage with its stats and row guide in the middle,
- * and the Layers panel on the right. Kept mounted while Shapes mode is showing,
+ * and the Canvas and Layers panels on the right. Kept mounted while Shapes mode is showing,
  * so the undo history survives the trip; `active` says which mode is showing.
  */
 export function CompositeMode({ active, view }: { active: boolean; view: SharedView }) {
@@ -84,8 +85,16 @@ export function CompositeMode({ active, view }: { active: boolean; view: SharedV
 
       <div className="grid grid-cols-[330px_minmax(0,1fr)_300px] items-start gap-5 max-narrow:grid-cols-[300px_minmax(0,1fr)] max-phone:grid-cols-[minmax(0,1fr)]">
         <aside className="flex min-w-0 flex-col gap-5">
-          <Panel title={api.selected ? api.selected.name || "Layer" : "Canvas"} accent="gold">
-            {api.selected ? <LayerSettings key={api.selected.id} api={api} layer={api.selected} /> : <CanvasSettings api={api} />}
+          <Panel title={api.selected?.name || "Layer"} accent="gold">
+            {api.selected ? (
+              <LayerSettings key={api.selected.id} api={api} layer={api.selected} />
+            ) : (
+              <FieldDescription>
+                {api.composite.layers.length
+                  ? "Select a layer in the Layers panel, or Ctrl-click it on the canvas, to edit it."
+                  : "Drag a shape from the bar above onto the canvas to start."}
+              </FieldDescription>
+            )}
           </Panel>
 
           <Panel title="Block" accent="amethyst">
@@ -144,9 +153,14 @@ export function CompositeMode({ active, view }: { active: boolean; view: SharedV
           </Collapsible>
         </section>
 
-        <Panel title="Layers" accent="diamond" className="max-narrow:col-span-full">
-          <LayersPanel api={api} />
-        </Panel>
+        <aside className="flex min-w-0 flex-col gap-5 max-narrow:col-span-full">
+          <Panel title="Canvas" accent="grass">
+            <CanvasSettings api={api} />
+          </Panel>
+          <Panel title="Layers" accent="diamond">
+            <LayersPanel api={api} />
+          </Panel>
+        </aside>
       </div>
     </div>
   );
