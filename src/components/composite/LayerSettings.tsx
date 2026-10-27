@@ -3,12 +3,15 @@ import {
   CANVAS_MAX,
   CANVAS_MIN,
   isOffCanvas,
+  layerGrid,
   lineEndpoints,
   setLineEndpoints,
+  type ImageLayer,
   type Layer,
   type LineLayer,
 } from "../../composite/composite";
-import { centreLayer, moveLayer } from "../../composite/edit";
+import { centreLayer, layerCentre, moveLayer, placeCentre, resizeImageLayer } from "../../composite/edit";
+import { imageParams } from "../../composite/image";
 import type { CompositeApi } from "../../composite/useComposite";
 import { getShape, SHAPES } from "../../shapes";
 import { fillParams } from "../../shapes/fill";
@@ -38,8 +41,18 @@ export function LayerSettings({ api, layer }: { api: CompositeApi; layer: Layer 
       </div>
 
       <div {...stylex.props(ui.row)}>
-        <NumberField label="x" value={layer.x} onChange={x => set(l => moveLayer(l, x, l.y), "x")} />
-        <NumberField label="y" value={layer.y} onChange={y => set(l => moveLayer(l, l.x, y), "y")} />
+        {layer.kind === "image" ? (
+          // Images are placed by their centre block, which stays put while resizing.
+          <>
+            <NumberField label="centre x" value={layerCentre(layer).x} onChange={x => set(l => placeCentre(l, { ...layerCentre(l), x }), "x")} />
+            <NumberField label="centre y" value={layerCentre(layer).y} onChange={y => set(l => placeCentre(l, { ...layerCentre(l), y }), "y")} />
+          </>
+        ) : (
+          <>
+            <NumberField label="x" value={layer.x} onChange={x => set(l => moveLayer(l, x, l.y), "x")} />
+            <NumberField label="y" value={layer.y} onChange={y => set(l => moveLayer(l, l.x, y), "y")} />
+          </>
+        )}
         {isOffCanvas(layer, canvas) && <span {...stylex.props(ui.badge, ui.warn)}>Off canvas</span>}
       </div>
 
@@ -57,6 +70,7 @@ export function LayerSettings({ api, layer }: { api: CompositeApi; layer: Layer 
 
       {layer.kind === "shape" && <ShapeSettings api={api} layer={layer} />}
       {layer.kind === "line" && <LineSettings api={api} layer={layer} />}
+      {layer.kind === "image" && <ImageSettings api={api} layer={layer} />}
       {layer.kind === "eraser" && (
         <p {...stylex.props(ui.muted)}>
           {layer.cells.length
@@ -132,6 +146,25 @@ function LineSettings({ api, layer }: { api: CompositeApi; layer: LineLayer }) {
       <p {...stylex.props(ui.muted)}>
         Endpoints are canvas x/y. Drag the yellow handles with the Move tool; Shift snaps to 0°, 45° or 90°.
       </p>
+    </>
+  );
+}
+
+function ImageSettings({ api, layer }: { api: CompositeApi; layer: ImageLayer }) {
+  const setValue = (key: string, value: ParamValue) =>
+    api.updateLayer(layer.id, l => (l.kind === "image" ? resizeImageLayer(l, { ...l.values, [key]: value }) : l), key);
+  const values = resolveValues(imageParams, layer.values);
+  const grid = layerGrid(layer);
+  return (
+    <>
+      <p {...stylex.props(ui.muted)}>
+        <span {...stylex.props(ui.badge)}>experimental</span> Traced from an imported picture · {grid.width} ×{" "}
+        {grid.height} blocks
+      </p>
+      <ParamControls params={imageParams} values={values} onChange={setValue} />
+      {values.trace === "silhouette" && (
+        <ParamControls params={fillParams} values={resolveValues(fillParams, layer.values)} onChange={setValue} />
+      )}
     </>
   );
 }

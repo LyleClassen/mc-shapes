@@ -194,9 +194,13 @@ function isComposite(v: unknown): boolean {
       typeof l.y === "number" &&
       ((l.kind === "shape" && typeof l.shapeId === "string" && isObject(l.values)) ||
         (l.kind === "line" && isObject(l.a) && isObject(l.b)) ||
-        (l.kind === "eraser" && Array.isArray(l.cells))),
+        (l.kind === "eraser" && Array.isArray(l.cells)) ||
+        (l.kind === "image" && isMask(l.mask) && isObject(l.values))),
   );
 }
+
+const isMask = (m: unknown) =>
+  isObject(m) && typeof m.id === "string" && typeof m.bits === "string" && typeof m.width === "number" && typeof m.height === "number";
 
 function isOptions(v: unknown): boolean {
   return (

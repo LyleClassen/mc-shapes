@@ -4,6 +4,7 @@ import { EMPTY_GRID, trim, trimOffset, type Grid } from "../shapes/grid";
 import type { Point } from "../shapes/raster";
 import { resolveValues, type ParamValues } from "../shapes/types";
 import { rasterLine } from "./draw";
+import { DEFAULT_IMAGE_VALUES, imageGrid, type ImageMask } from "./image";
 
 export const CANVAS_MIN = 8;
 export const CANVAS_MAX = 256;
@@ -43,7 +44,14 @@ export interface EraserLayer extends BaseLayer {
   cells: readonly Point[];
 }
 
-export type Layer = ShapeLayer | LineLayer | EraserLayer;
+/** Experimental: a picture traced into blocks. `values` holds its size and trace mode, plus Fill for silhouettes. */
+export interface ImageLayer extends BaseLayer {
+  kind: "image";
+  mask: ImageMask;
+  values: ParamValues;
+}
+
+export type Layer = ShapeLayer | LineLayer | EraserLayer | ImageLayer;
 export type LayerKind = Layer["kind"];
 
 /** Layers are ordered bottom to top. */
@@ -117,6 +125,8 @@ export function layerGrid(layer: Layer): Grid {
       return gridOfPoints(rasterLine(layer.a, layer.b));
     case "eraser":
       return gridOfPoints(layer.cells);
+    case "image":
+      return imageGrid(layer.mask, layer.values);
   }
 }
 
@@ -171,7 +181,7 @@ export function centredPosition(grid: Grid, canvas: Canvas): Point {
   return { x: Math.floor((canvas.width - grid.width) / 2), y: Math.floor((canvas.height - grid.height) / 2) };
 }
 
-const KIND_NAMES: Record<Exclude<LayerKind, "shape">, string> = { line: "Line", eraser: "Eraser" };
+const KIND_NAMES: Record<Exclude<LayerKind, "shape">, string> = { line: "Line", eraser: "Eraser", image: "Image" };
 
 /** The next free auto-name, e.g. "Circle 3" or "Eraser 1". */
 export function nextLayerName(layers: readonly Layer[], base: string): string {
@@ -189,6 +199,15 @@ export function newShapeLayer(composite: Composite, shapeId: string, values: Par
   const pos = centredPosition(shapeGrid(shape.id, values), composite.canvas);
   const name = nextLayerName(composite.layers, shape.name);
   return { kind: "shape", id: newId(), name, visible: true, ...pos, shapeId: shape.id, values };
+}
+
+/** A new image layer centred on the canvas, named after its file. Starts at most 64 blocks wide. */
+export function newImageLayer(composite: Composite, mask: ImageMask, fileName = ""): ImageLayer {
+  const values = { ...DEFAULT_IMAGE_VALUES, size: Math.min(Number(DEFAULT_IMAGE_VALUES.size), composite.canvas.width) };
+  const pos = centredPosition(imageGrid(mask, values), composite.canvas);
+  const base = fileName.replace(/\.[^.]*$/, "").trim() || KIND_NAMES.image;
+  const name = nextLayerName(composite.layers, base);
+  return { kind: "image", id: newId(), name, visible: true, ...pos, mask, values };
 }
 
 /** The line's endpoints in canvas coordinates. */

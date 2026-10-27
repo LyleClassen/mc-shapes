@@ -1,6 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
-import { useMemo } from "react";
-import { EMPTY_COMPOSITE, newShapeLayer } from "../../composite/composite";
+import { useMemo, useRef } from "react";
+import { EMPTY_COMPOSITE, newImageLayer, newShapeLayer } from "../../composite/composite";
+import { loadImageMask } from "../../composite/image";
 import type { CompositeApi, Tool, ToolOptions } from "../../composite/useComposite";
 import { SHAPES } from "../../shapes";
 import { fillParams } from "../../shapes/fill";
@@ -15,7 +16,7 @@ const TOOLS: readonly { id: Tool; label: string; glyph: string }[] = [
   { id: "eraser", label: "Eraser", glyph: "⌫" },
 ];
 
-/** The top bar: tools, then the shape palette (drag a shape onto the canvas), then undo and redo. */
+/** The top bar: tools, the shape palette (drag a shape onto the canvas), image import, then undo and redo. */
 export function CompositeToolbar({ api }: { api: CompositeApi }) {
   // A thumbnail per shape at its defaults; the palette never changes.
   const palette = useMemo(
@@ -72,6 +73,10 @@ export function CompositeToolbar({ api }: { api: CompositeApi }) {
         </div>
       </div>
 
+      <span {...stylex.props(styles.divider)} />
+
+      <ImageImport api={api} />
+
       <span {...stylex.props(ui.grow)} />
 
       <div {...stylex.props(styles.group)}>
@@ -82,6 +87,47 @@ export function CompositeToolbar({ api }: { api: CompositeApi }) {
           ↷ Redo
         </button>
       </div>
+    </div>
+  );
+}
+
+/** Experimental: picks a picture file and adds it as a traced image layer. */
+function ImageImport({ api }: { api: CompositeApi }) {
+  const input = useRef<HTMLInputElement>(null);
+  const load = async (file: File) => {
+    try {
+      const mask = await loadImageMask(file);
+      if (mask) api.addLayer(newImageLayer(api.composite, mask, file.name));
+      else api.say("Nothing to trace: that picture looks blank");
+    } catch {
+      api.say("Couldn't read that file as a picture");
+    }
+  };
+  return (
+    <div {...stylex.props(styles.paletteGroup)}>
+      <span {...stylex.props(styles.caption)}>
+        Trace a picture <span {...stylex.props(ui.badge)}>experimental</span>
+      </span>
+      <button
+        type="button"
+        title="Import a picture and trace it into blocks"
+        onClick={() => input.current?.click()}
+        {...stylex.props(ui.button)}
+      >
+        ⇪ Import image
+      </button>
+      <input
+        ref={input}
+        type="file"
+        accept="image/*"
+        hidden
+        onChange={e => {
+          const file = e.target.files?.[0];
+          // Cleared so picking the same file again still fires.
+          e.target.value = "";
+          if (file) void load(file);
+        }}
+      />
     </div>
   );
 }

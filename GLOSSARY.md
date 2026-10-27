@@ -49,6 +49,14 @@ _Avoid_: Stroke, segment
 A layer that removes blocks from the layers below it. It is made of the cells painted into it, and painted cells can be restored.
 _Avoid_: Delete, clear
 
+**Image layer** (experimental):
+A layer traced from an imported picture. It keeps the picture's drawn part as a mask, so its size and trace mode can be changed at any time. It is placed by its centre block, which stays put while resizing.
+_Avoid_: Picture layer, sprite
+
+**Trace mode**:
+How an image layer turns the picture into blocks: _Lines_ follows every drawn line one block wide; _Silhouette_ fills the outer shape (optionally closing gaps in it) and then applies Fill.
+_Avoid_: Filter, effect
+
 **Flatten**:
 Turning a composite's visible layers, bottom to top, into its one block plan.
 _Avoid_: Merge, render, bake

@@ -1,14 +1,17 @@
 import { getShape } from "../shapes";
 import { isFilled } from "../shapes/grid";
 import type { Point } from "../shapes/raster";
+import { resolveValues, type ParamValues } from "../shapes/types";
 import {
   centredPosition,
   layerGrid,
   lineEndpoints,
   type Canvas,
   type Composite,
+  type ImageLayer,
   type Layer,
 } from "./composite";
+import { imageParams } from "./image";
 
 /** Swaps in a new version of a layer, matched by id. */
 export function replaceLayer(composite: Composite, layer: Layer): Composite {
@@ -52,6 +55,26 @@ export function moveLayer<L extends Layer>(layer: L, x: number, y: number): L {
 export function centreLayer<L extends Layer>(layer: L, canvas: Canvas, horizontally: boolean, vertically: boolean): L {
   const target = centredPosition(layerGrid(layer), canvas);
   return moveLayer(layer, horizontally ? target.x : layer.x, vertically ? target.y : layer.y);
+}
+
+/**
+ * The layer's centre block on the canvas: its middle block, or on an even
+ * side the one just right of (or below) the middle. Its position when empty.
+ */
+export function layerCentre(layer: Layer): Point {
+  const grid = layerGrid(layer);
+  return { x: layer.x + Math.floor(grid.width / 2), y: layer.y + Math.floor(grid.height / 2) };
+}
+
+/** Moves the layer so its centre block lands on canvas cell `c`. */
+export function placeCentre<L extends Layer>(layer: L, c: Point): L {
+  const grid = layerGrid(layer);
+  return moveLayer(layer, c.x - Math.floor(grid.width / 2), c.y - Math.floor(grid.height / 2));
+}
+
+/** New size, trace or Fill for an image layer, growing and shrinking around its centre. */
+export function resizeImageLayer(layer: ImageLayer, values: ParamValues): ImageLayer {
+  return placeCentre({ ...layer, values }, layerCentre(layer));
 }
 
 export interface Box {
@@ -100,5 +123,11 @@ export function describeLayer(layer: Layer): string {
     }
     case "eraser":
       return layer.cells.length === 1 ? "1 cell" : `${layer.cells.length} cells`;
+    case "image": {
+      const grid = layerGrid(layer);
+      const trace = resolveValues(imageParams, layer.values).trace;
+      const style = trace === "lines" ? "lines" : layer.values.fill === "hollow" ? "outline" : "solid";
+      return `Image · ${grid.width} × ${grid.height} · ${style}`;
+    }
   }
 }

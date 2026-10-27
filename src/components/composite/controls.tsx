@@ -83,9 +83,9 @@ export function Segmented<T extends string>({
   );
 }
 
-const THUMB_COLORS = { shape: "#72e36c", line: "#ffd23f", eraser: "#ff5b7c" } as const;
+const THUMB_COLORS = { shape: "#72e36c", line: "#ffd23f", eraser: "#ff5b7c", image: "#5fd4ff" } as const;
 
-/** A tiny render of a layer's own cells: shapes green, lines yellow, erasers red. */
+/** A tiny render of a layer's own cells: shapes green, lines yellow, erasers red, images blue. */
 export function LayerThumb({ layer, size = 32 }: { layer: Layer; size?: number }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
