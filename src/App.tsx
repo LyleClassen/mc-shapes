@@ -1,4 +1,4 @@
-import { CheckIcon, CopyIcon } from "lucide-react";
+import { CheckIcon, CopyIcon, ExternalLinkIcon } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { BlockStage, type Cell } from "./components/BlockStage";
 import { CompositeMode } from "./components/composite/CompositeMode";
@@ -188,6 +188,22 @@ export function App() {
             </Panel>
           </main>
         )}
+
+        <footer className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 border-t pt-4 text-xs text-muted-foreground">
+          <span>Shape Crafter is open source — contributions welcome.</span>
+          <span aria-hidden>·</span>
+          <a
+            href={REPO_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 font-bold text-foreground underline-offset-4 hover:underline"
+          >
+            View on GitHub
+            <ExternalLinkIcon className="size-3" aria-hidden />
+          </a>
+          <span aria-hidden>·</span>
+          <span>MIT licensed</span>
+        </footer>
       </div>
     </TooltipProvider>
   );
@@ -195,6 +211,8 @@ export function App() {
 
 const LOGO_BLOCK =
   "h-[22px] w-[22px] animate-bob border-[3px] border-shadow shadow-[inset_4px_4px_0_rgba(255,255,255,0.35),inset_-4px_-4px_0_rgba(0,0,0,0.3)]";
+
+const REPO_URL = "https://github.com/LyleClassen/mc-shapes";
 
 const EMPTY_SET: ReadonlySet<number> = new Set();
 
