@@ -1,8 +1,8 @@
-import * as stylex from "@stylexjs/stylex";
 import { useEffect, useRef } from "react";
 import { trim } from "../shapes/grid";
 import { defaultValues, type ShapeModule } from "../shapes/types";
-import { colors, fonts } from "../theme/tokens.stylex";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface Props {
   shapes: readonly ShapeModule[];
@@ -12,24 +12,27 @@ interface Props {
 
 export function ShapePicker({ shapes, selected, onSelect }: Props) {
   return (
-    <div {...stylex.props(styles.grid)}>
-      {shapes.map(shape => {
-        const active = shape.id === selected;
-        return (
-          <button
-            key={shape.id}
-            type="button"
-            title={shape.description}
-            aria-pressed={active}
-            onClick={() => onSelect(shape.id)}
-            {...stylex.props(styles.card, active && styles.cardActive)}
-          >
-            <ShapeThumb shape={shape} active={active} />
-            <span {...stylex.props(styles.name)}>{shape.name}</span>
-          </button>
-        );
-      })}
-    </div>
+    <ToggleGroup
+      aria-label="Shape"
+      variant="card"
+      className="grid w-full grid-cols-[repeat(auto-fill,minmax(88px,1fr))] items-stretch gap-2"
+      value={[selected]}
+      onValueChange={v => v[0] && onSelect(v[0])}
+    >
+      {shapes.map(shape => (
+        <Tooltip key={shape.id}>
+          <TooltipTrigger
+            render={
+              <ToggleGroupItem value={shape.id}>
+                <ShapeThumb shape={shape} active={shape.id === selected} />
+                <span className="text-center text-xs leading-[1.2]">{shape.name}</span>
+              </ToggleGroupItem>
+            }
+          />
+          <TooltipContent>{shape.description}</TooltipContent>
+        </Tooltip>
+      ))}
+    </ToggleGroup>
   );
 }
 
@@ -61,49 +64,5 @@ function ShapeThumb({ shape, active }: { shape: ShapeModule; active: boolean }) 
     }
   }, [shape, active]);
 
-  return <canvas ref={ref} aria-hidden {...stylex.props(styles.thumb)} />;
+  return <canvas ref={ref} aria-hidden className="[image-rendering:pixelated]" style={{ width: THUMB, height: THUMB }} />;
 }
-
-const styles = stylex.create({
-  grid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(88px, 1fr))",
-    gap: 8,
-  },
-  card: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: 6,
-    paddingBlock: 10,
-    paddingInline: 6,
-    borderWidth: 2,
-    borderStyle: "solid",
-    borderColor: { default: colors.line, ":hover": colors.inkFaint },
-    borderRadius: 4,
-    backgroundColor: { default: colors.panelSunk, ":hover": colors.panelRaised },
-    color: colors.inkSoft,
-    cursor: "pointer",
-    boxShadow: `3px 3px 0 ${colors.shadow}`,
-    transform: { default: null, ":hover": "translateY(-2px)", ":active": "translateY(1px)" },
-    transitionProperty: "transform, background-color, border-color",
-    transitionDuration: "120ms",
-  },
-  cardActive: {
-    borderColor: { default: colors.gold, ":hover": colors.gold },
-    backgroundColor: { default: colors.panelRaised, ":hover": colors.panelRaised },
-    color: colors.ink,
-  },
-  thumb: {
-    width: THUMB,
-    height: THUMB,
-    imageRendering: "pixelated",
-  },
-  name: {
-    fontFamily: fonts.body,
-    fontSize: 12,
-    fontWeight: 800,
-    lineHeight: 1.2,
-    textAlign: "center",
-  },
-});

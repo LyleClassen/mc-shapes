@@ -1,20 +1,37 @@
-import * as stylex from "@stylexjs/stylex";
-import { useMemo, useRef } from "react";
+import { EraserIcon, ImageUpIcon, MoveIcon, Redo2Icon, SlashIcon, Undo2Icon, type LucideIcon } from "lucide-react";
+import { useMemo, useRef, type ReactElement } from "react";
 import { EMPTY_COMPOSITE, newImageLayer, newShapeLayer } from "../../composite/composite";
 import { loadImageMask } from "../../composite/image";
 import type { CompositeApi, Tool, ToolOptions } from "../../composite/useComposite";
 import { SHAPES } from "../../shapes";
 import { fillParams } from "../../shapes/fill";
 import { defaultValues } from "../../shapes/types";
-import { colors, fonts } from "../../theme/tokens.stylex";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import { Slider } from "@/components/ui/slider";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { SHAPE_TYPE } from "./CompositeStage";
-import { LayerThumb, Segmented, styles as ui } from "./controls";
+import { LayerThumb, Segmented } from "./controls";
 
-const TOOLS: readonly { id: Tool; label: string; glyph: string }[] = [
-  { id: "move", label: "Move", glyph: "✥" },
-  { id: "line", label: "Line", glyph: "╱" },
-  { id: "eraser", label: "Eraser", glyph: "⌫" },
+const TOOLS: readonly { id: Tool; label: string; icon: LucideIcon }[] = [
+  { id: "move", label: "Move", icon: MoveIcon },
+  { id: "line", label: "Line", icon: SlashIcon },
+  { id: "eraser", label: "Eraser", icon: EraserIcon },
 ];
+
+/** Wraps a control in a hover hint. */
+function Hint({ text, children }: { text: string; children: ReactElement }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger render={children} />
+      <TooltipContent>{text}</TooltipContent>
+    </Tooltip>
+  );
+}
 
 /** The top bar: tools, the shape palette (drag a shape onto the canvas), image import, then undo and redo. */
 export function CompositeToolbar({ api }: { api: CompositeApi }) {
@@ -29,65 +46,73 @@ export function CompositeToolbar({ api }: { api: CompositeApi }) {
   );
 
   return (
-    <div {...stylex.props(styles.bar)}>
-      <div role="radiogroup" aria-label="Tool" {...stylex.props(styles.group)}>
-        {TOOLS.map(t => (
-          <button
-            key={t.id}
-            type="button"
-            role="radio"
-            aria-checked={api.tool === t.id}
-            title={t.label}
-            onClick={() => api.setTool(t.id)}
-            {...stylex.props(styles.tool, api.tool === t.id && styles.toolOn)}
-          >
-            <span aria-hidden {...stylex.props(styles.glyph)}>
-              {t.glyph}
-            </span>
-            {t.label}
-          </button>
+    <Card className="flex-row flex-wrap items-center gap-2.5 p-2.5">
+      <ToggleGroup
+        aria-label="Tool"
+        variant="tool"
+        spacing={1}
+        value={[api.tool]}
+        onValueChange={v => v[0] && api.setTool(v[0] as Tool)}
+      >
+        {TOOLS.map(({ id, label, icon: Icon }) => (
+          <Hint key={id} text={label}>
+            <ToggleGroupItem value={id}>
+              <Icon data-icon="inline-start" />
+              {label}
+            </ToggleGroupItem>
+          </Hint>
         ))}
-      </div>
+      </ToggleGroup>
 
-      <span {...stylex.props(styles.divider)} />
+      <Separator orientation="vertical" />
 
-      <div {...stylex.props(styles.paletteGroup)}>
-        <span {...stylex.props(styles.caption)}>Drag a shape onto the canvas ↓</span>
-        <div {...stylex.props(styles.palette)}>
+      <div className="flex flex-col gap-1">
+        <span className="text-[11px] font-extrabold text-grass">Drag a shape onto the canvas ↓</span>
+        <div className="flex flex-wrap gap-1">
           {palette.map(({ shape, layer }) => (
-            <span
-              key={shape.id}
-              draggable
-              title={`Drag a ${shape.name.toLowerCase()} onto the canvas`}
-              onDragStart={e => {
-                e.dataTransfer.setData(SHAPE_TYPE, shape.id);
-                e.dataTransfer.effectAllowed = "copy";
-              }}
-              onClick={() => api.say(`Drag the ${shape.name.toLowerCase()} onto the canvas to place it`)}
-              {...stylex.props(styles.tile)}
-            >
-              <LayerThumb layer={layer} size={26} />
-              {shape.name}
-            </span>
+            <Hint key={shape.id} text={`Drag a ${shape.name.toLowerCase()} onto the canvas`}>
+              <span
+                draggable
+                onDragStart={e => {
+                  e.dataTransfer.setData(SHAPE_TYPE, shape.id);
+                  e.dataTransfer.effectAllowed = "copy";
+                }}
+                onClick={() => api.say(`Drag the ${shape.name.toLowerCase()} onto the canvas to place it`)}
+                className="flex cursor-grab items-center gap-1.5 rounded-[4px] border-2 border-input bg-secondary px-2 py-1 text-[11px] font-extrabold text-secondary-foreground select-none hover:border-grass hover:bg-accent"
+              >
+                <LayerThumb layer={layer} size={26} />
+                {shape.name}
+              </span>
+            </Hint>
           ))}
         </div>
       </div>
 
-      <span {...stylex.props(styles.divider)} />
+      <Separator orientation="vertical" />
 
       <ImageImport api={api} />
 
-      <span {...stylex.props(ui.grow)} />
+      <span className="grow" />
 
-      <div {...stylex.props(styles.group)}>
-        <button type="button" title="Undo (Ctrl+Z)" disabled={!api.canUndo} onClick={api.undo} {...stylex.props(ui.button)}>
-          ↶ Undo
-        </button>
-        <button type="button" title="Redo (Ctrl+Shift+Z)" disabled={!api.canRedo} onClick={api.redo} {...stylex.props(ui.button)}>
-          ↷ Redo
-        </button>
+      <div className="flex gap-1">
+        <Hint text="Undo (Ctrl+Z)">
+          <span>
+            <Button disabled={!api.canUndo} onClick={api.undo}>
+              <Undo2Icon data-icon="inline-start" />
+              Undo
+            </Button>
+          </span>
+        </Hint>
+        <Hint text="Redo (Ctrl+Shift+Z)">
+          <span>
+            <Button disabled={!api.canRedo} onClick={api.redo}>
+              <Redo2Icon data-icon="inline-start" />
+              Redo
+            </Button>
+          </span>
+        </Hint>
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -104,18 +129,16 @@ function ImageImport({ api }: { api: CompositeApi }) {
     }
   };
   return (
-    <div {...stylex.props(styles.paletteGroup)}>
-      <span {...stylex.props(styles.caption)}>
-        Trace a picture <span {...stylex.props(ui.badge)}>experimental</span>
+    <div className="flex flex-col gap-1">
+      <span className="text-[11px] font-extrabold text-grass">
+        Trace a picture <Badge>experimental</Badge>
       </span>
-      <button
-        type="button"
-        title="Import a picture and trace it into blocks"
-        onClick={() => input.current?.click()}
-        {...stylex.props(ui.button)}
-      >
-        ⇪ Import image
-      </button>
+      <Hint text="Import a picture and trace it into blocks">
+        <Button onClick={() => input.current?.click()}>
+          <ImageUpIcon data-icon="inline-start" />
+          Import image
+        </Button>
+      </Hint>
       <input
         ref={input}
         type="file"
@@ -139,7 +162,7 @@ export function EraserOptions({ api }: { api: CompositeApi }) {
   const canRestore = selected?.kind === "eraser";
 
   return (
-    <div {...stylex.props(ui.row, styles.options)}>
+    <Card className="flex-row flex-wrap items-center gap-2 border-2 p-2 shadow-none">
       <Segmented
         label="Eraser shape"
         value={options.eraserShape}
@@ -147,18 +170,18 @@ export function EraserOptions({ api }: { api: CompositeApi }) {
         onChange={eraserShape => set({ eraserShape })}
       />
       {options.eraserShape === "brush" && (
-        <label {...stylex.props(ui.field)}>
+        <Label className="gap-1.5 font-mono text-xs text-muted-foreground">
           Size
-          <input
-            type="range"
+          <Slider
+            tone="redstone"
+            className="w-[110px]"
             min={1}
             max={8}
             value={options.brushSize}
-            onChange={e => set({ brushSize: Number(e.target.value) })}
-            {...stylex.props(styles.slider)}
+            onValueChange={v => set({ brushSize: v as number })}
           />
-          <b {...stylex.props(styles.mono)}>{options.brushSize}</b>
-        </label>
+          <b className="min-w-3 font-mono text-diamond">{options.brushSize}</b>
+        </Label>
       )}
       <Segmented
         label="Erase or restore"
@@ -168,76 +191,9 @@ export function EraserOptions({ api }: { api: CompositeApi }) {
         title={canRestore ? undefined : "Select an eraser layer to restore its cells"}
         onChange={eraseMode => set({ eraseMode })}
       />
-      <span {...stylex.props(ui.muted)}>
+      <span className="text-xs leading-[1.45] text-muted-foreground">
         {canRestore ? `Painting into "${selected.name}"` : "Each stroke makes a new eraser layer"}
       </span>
-    </div>
+    </Card>
   );
 }
-
-const styles = stylex.create({
-  bar: {
-    display: "flex",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: 10,
-    padding: 10,
-    borderRadius: 6,
-    borderWidth: 3,
-    borderStyle: "solid",
-    borderColor: colors.line,
-    backgroundColor: colors.panel,
-    boxShadow: `5px 5px 0 ${colors.shadow}`,
-  },
-  group: { display: "flex", gap: 4 },
-  tool: {
-    display: "flex",
-    alignItems: "center",
-    gap: 6,
-    height: 38,
-    paddingInline: 10,
-    borderWidth: 2,
-    borderStyle: "solid",
-    borderColor: colors.line,
-    borderRadius: 4,
-    backgroundColor: { default: colors.panelSunk, ":hover": colors.panelRaised },
-    color: colors.inkSoft,
-    fontFamily: fonts.body,
-    fontSize: 12,
-    fontWeight: 800,
-    cursor: "pointer",
-  },
-  toolOn: { borderColor: colors.gold, color: colors.gold, backgroundColor: colors.panelRaised },
-  glyph: { fontSize: 17, lineHeight: 1 },
-  divider: { width: 2, alignSelf: "stretch", backgroundColor: colors.line },
-  paletteGroup: { display: "flex", flexDirection: "column", gap: 4 },
-  caption: { fontSize: 11, fontWeight: 800, color: colors.grass },
-  palette: { display: "flex", flexWrap: "wrap", gap: 4 },
-  tile: {
-    display: "flex",
-    alignItems: "center",
-    gap: 6,
-    paddingBlock: 4,
-    paddingInline: 8,
-    borderWidth: 2,
-    borderStyle: "solid",
-    borderColor: { default: colors.line, ":hover": colors.grass },
-    borderRadius: 4,
-    backgroundColor: { default: colors.panelSunk, ":hover": colors.panelRaised },
-    color: colors.inkSoft,
-    fontSize: 11,
-    fontWeight: 800,
-    cursor: "grab",
-    userSelect: "none",
-  },
-  options: {
-    padding: 8,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderStyle: "solid",
-    borderColor: colors.line,
-    backgroundColor: colors.panel,
-  },
-  slider: { width: 110, accentColor: colors.redstone },
-  mono: { fontFamily: fonts.mono, color: colors.diamond, minWidth: 12 },
-});

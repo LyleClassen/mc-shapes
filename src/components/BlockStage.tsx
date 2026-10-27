@@ -1,11 +1,14 @@
-import * as stylex from "@stylexjs/stylex";
+import { MinusIcon, PlusIcon } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { drawGrid, MAX_CANVAS_PX } from "../render/drawGrid";
 import type { Skin } from "../render/skins";
 import type { CenterMarks } from "../shapes/center";
 import type { Highlight } from "../shapes/patterns";
 import { isFilled, type Grid, type Span } from "../shapes/grid";
-import { colors, fonts } from "../theme/tokens.stylex";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
+import { Toggle } from "@/components/ui/toggle";
 
 export interface Cell {
   x: number;
@@ -26,6 +29,7 @@ interface Props {
   onHover: (cell: Cell | null) => void;
 }
 
+// Matches the stage's p-6.
 const STAGE_PADDING = 24;
 const MAX_PADDING = 16;
 
@@ -65,64 +69,47 @@ export function BlockStage({ grid, center, guides, highlight, skin, highlightRow
   };
 
   return (
-    <div {...stylex.props(styles.wrap)}>
-      <div {...stylex.props(styles.toolbar)}>
-        <button type="button" onClick={() => setZoom(null)} {...stylex.props(styles.chip, zoom === null && styles.chipOn)}>
+    <div className="flex min-w-0 flex-col gap-2.5">
+      <div className="flex flex-wrap items-center gap-2.5">
+        <Toggle variant="chip" pressed={zoom === null} onPressedChange={() => setZoom(null)}>
           Fit
-        </button>
-        <label {...stylex.props(styles.zoomLabel)}>
+        </Toggle>
+        <Label className="min-w-[180px] grow text-[13px] text-secondary-foreground">
           Zoom
-          <input
-            type="range"
-            min={2}
-            max={maxCell}
-            value={cell}
-            onChange={e => setZoom(Number(e.target.value))}
-            {...stylex.props(styles.zoom)}
-          />
-          <span {...stylex.props(styles.mono)}>{cell}px</span>
-        </label>
-        <button
-          type="button"
-          aria-pressed={gridLines}
-          onClick={() => setGridLines(g => !g)}
-          {...stylex.props(styles.chip, gridLines && styles.chipOn)}
-        >
+          <Slider tone="diamond" min={2} max={maxCell} value={cell} onValueChange={v => setZoom(v as number)} />
+          <span className="min-w-[38px] text-right font-mono text-xs text-diamond">{cell}px</span>
+        </Label>
+        <Toggle variant="chip" pressed={gridLines} onPressedChange={setGridLines}>
           Grid lines
-        </button>
-        <button
-          type="button"
-          aria-pressed={showCenter}
-          onClick={() => setShowCenter(v => !v)}
-          {...stylex.props(styles.chip, showCenter && styles.chipOn)}
-        >
+        </Toggle>
+        <Toggle variant="chip" pressed={showCenter} onPressedChange={setShowCenter}>
           Centre
-        </button>
-        <div {...stylex.props(styles.padGroup)} role="group" aria-label="Padding">
+        </Toggle>
+        <div className="flex items-center gap-1.5 text-[13px] font-extrabold text-secondary-foreground" role="group" aria-label="Padding">
           <span>Padding</span>
-          <button
-            type="button"
-            aria-label="Less padding"
-            disabled={padding <= 0}
-            onClick={() => setPadding(p => Math.max(0, p - 1))}
-            {...stylex.props(styles.stepper)}
-          >
-            −
-          </button>
-          <span {...stylex.props(styles.mono, styles.padValue)}>{padding}</span>
-          <button
-            type="button"
+          <Button size="icon" aria-label="Less padding" disabled={padding <= 0} onClick={() => setPadding(p => Math.max(0, p - 1))}>
+            <MinusIcon />
+          </Button>
+          <span className="min-w-[18px] text-center font-mono text-xs text-diamond">{padding}</span>
+          <Button
+            size="icon"
             aria-label="More padding"
             disabled={padding >= MAX_PADDING}
             onClick={() => setPadding(p => Math.min(MAX_PADDING, p + 1))}
-            {...stylex.props(styles.stepper)}
           >
-            +
-          </button>
+            <PlusIcon />
+          </Button>
         </div>
       </div>
 
-      <div ref={stageRef} {...stylex.props(styles.stage)}>
+      <div
+        ref={stageRef}
+        className="relative flex h-[min(68vh,760px)] min-h-80 overflow-auto rounded-md border-[3px] border-border bg-sky-deep p-6 shadow-[inset_0_0_0_2px_var(--shadow),5px_5px_0_var(--shadow)]"
+        style={{
+          backgroundImage:
+            "radial-gradient(circle at 20% 15%, rgba(185,140,255,0.16), transparent 40%), radial-gradient(circle at 85% 90%, rgba(82,241,229,0.12), transparent 45%)",
+        }}
+      >
         {grid.width > 0 ? (
           <canvas
             ref={canvasRef}
@@ -131,14 +118,14 @@ export function BlockStage({ grid, center, guides, highlight, skin, highlightRow
               if (next?.x !== hover?.x || next?.y !== hover?.y) onHover(next);
             }}
             onPointerLeave={() => onHover(null)}
-            {...stylex.props(styles.canvas)}
+            className="m-auto shrink-0 cursor-crosshair touch-none shadow-[0_0_0_3px_var(--shadow),0_12px_40px_rgba(0,0,0,0.45)] [image-rendering:pixelated]"
           />
         ) : (
-          <p {...stylex.props(styles.empty)}>No blocks with these settings — try making it bigger.</p>
+          <p className="m-auto font-bold text-muted-foreground">No blocks with these settings — try making it bigger.</p>
         )}
       </div>
 
-      <div {...stylex.props(styles.readout)} aria-live="polite">
+      <div className="flex min-h-[22px] flex-wrap gap-4 text-[13px] text-muted-foreground" aria-live="polite">
         {hover ? (
           <HoverReadout grid={grid} cell={hover} />
         ) : (
@@ -152,13 +139,15 @@ export function BlockStage({ grid, center, guides, highlight, skin, highlightRow
   );
 }
 
+const EM = "font-mono text-gold";
+
 function CenterReadout({ center: { x: cx, y: cy } }: { center: CenterMarks }) {
   const range = (s: Span) =>
     s.length === 1 ? `${s.start + 1}` : `${s.start + 1}–${s.start + s.length}`;
   return (
     <span>
-      Centre {cx.length}×{cy.length} · Column <b {...stylex.props(styles.em)}>{range(cx)}</b> · Row{" "}
-      <b {...stylex.props(styles.em)}>{range(cy)}</b>
+      Centre {cx.length}×{cy.length} · Column <b className={EM}>{range(cx)}</b> · Row{" "}
+      <b className={EM}>{range(cy)}</b>
     </span>
   );
 }
@@ -170,10 +159,10 @@ function HoverReadout({ grid, cell }: { grid: Grid; cell: Cell }) {
   return (
     <>
       <span>
-        Column <b {...stylex.props(styles.em)}>{cell.x + 1}</b> · Row <b {...stylex.props(styles.em)}>{cell.y + 1}</b>
+        Column <b className={EM}>{cell.x + 1}</b> · Row <b className={EM}>{cell.y + 1}</b>
       </span>
       <span>
-        From centre <b {...stylex.props(styles.em)}>{fmt(dx)}</b>, <b {...stylex.props(styles.em)}>{fmt(dy)}</b>
+        From centre <b className={EM}>{fmt(dx)}</b>, <b className={EM}>{fmt(dy)}</b>
       </span>
       <span>{isFilled(grid, cell.x, cell.y) ? "■ block" : "□ empty"}</span>
     </>
@@ -195,127 +184,3 @@ function useElementSize(ref: React.RefObject<HTMLElement | null>) {
   }, [ref]);
   return size;
 }
-
-const styles = stylex.create({
-  wrap: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 10,
-    minWidth: 0,
-  },
-  toolbar: {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: 10,
-  },
-  chip: {
-    paddingBlock: 6,
-    paddingInline: 12,
-    borderWidth: 2,
-    borderStyle: "solid",
-    borderColor: colors.line,
-    borderRadius: 3,
-    backgroundColor: { default: colors.panelSunk, ":hover": colors.panelRaised },
-    color: colors.inkSoft,
-    fontFamily: fonts.body,
-    fontSize: 13,
-    fontWeight: 800,
-    cursor: "pointer",
-  },
-  chipOn: {
-    borderColor: colors.diamond,
-    color: colors.diamond,
-  },
-  padGroup: {
-    display: "flex",
-    alignItems: "center",
-    gap: 6,
-    color: colors.inkSoft,
-    fontSize: 13,
-    fontWeight: 800,
-  },
-  padValue: {
-    minWidth: 18,
-    textAlign: "center",
-  },
-  stepper: {
-    width: 26,
-    height: 26,
-    padding: 0,
-    borderWidth: 2,
-    borderStyle: "solid",
-    borderColor: colors.line,
-    borderRadius: 3,
-    backgroundColor: { default: colors.panelSunk, ":hover": colors.panelRaised },
-    color: colors.ink,
-    fontSize: 16,
-    fontWeight: 900,
-    lineHeight: 1,
-    cursor: { default: "pointer", ":disabled": "not-allowed" },
-    opacity: { default: 1, ":disabled": 0.4 },
-  },
-  zoomLabel: {
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-    flexGrow: 1,
-    minWidth: 180,
-    color: colors.inkSoft,
-    fontSize: 13,
-    fontWeight: 800,
-  },
-  zoom: {
-    flexGrow: 1,
-    minWidth: 0,
-    accentColor: colors.diamond,
-  },
-  mono: {
-    fontFamily: fonts.mono,
-    fontSize: 12,
-    color: colors.diamond,
-    minWidth: 38,
-    textAlign: "right",
-  },
-  stage: {
-    position: "relative",
-    height: "min(68vh, 760px)",
-    minHeight: 320,
-    overflow: "auto",
-    display: "flex",
-    padding: STAGE_PADDING,
-    borderRadius: 6,
-    borderWidth: 3,
-    borderStyle: "solid",
-    borderColor: colors.line,
-    backgroundColor: colors.skyDeep,
-    backgroundImage:
-      "radial-gradient(circle at 20% 15%, rgba(185,140,255,0.16), transparent 40%), radial-gradient(circle at 85% 90%, rgba(82,241,229,0.12), transparent 45%)",
-    boxShadow: `inset 0 0 0 2px ${colors.shadow}, 5px 5px 0 ${colors.shadow}`,
-  },
-  canvas: {
-    margin: "auto",
-    flexShrink: 0,
-    cursor: "crosshair",
-    imageRendering: "pixelated",
-    boxShadow: `0 0 0 3px ${colors.shadow}, 0 12px 40px rgba(0,0,0,0.45)`,
-    touchAction: "none",
-  },
-  empty: {
-    margin: "auto",
-    color: colors.inkFaint,
-    fontWeight: 700,
-  },
-  readout: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: 16,
-    minHeight: 22,
-    fontSize: 13,
-    color: colors.inkFaint,
-  },
-  em: {
-    fontFamily: fonts.mono,
-    color: colors.gold,
-  },
-});

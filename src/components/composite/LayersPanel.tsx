@@ -1,10 +1,13 @@
-import * as stylex from "@stylexjs/stylex";
+import { EyeIcon, EyeOffIcon } from "lucide-react";
 import { useState } from "react";
 import { isOffCanvas } from "../../composite/composite";
 import { describeLayer } from "../../composite/edit";
 import type { CompositeApi } from "../../composite/useComposite";
-import { colors } from "../../theme/tokens.stylex";
-import { LayerThumb, styles as ui } from "./controls";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { FieldDescription } from "@/components/ui/field";
+import { cn } from "@/lib/utils";
+import { LayerThumb } from "./controls";
 
 const LAYER_TYPE = "application/x-composite-layer";
 
@@ -14,11 +17,11 @@ export function LayersPanel({ api }: { api: CompositeApi }) {
   const [dragId, setDragId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
 
-  if (!layers.length) return <p {...stylex.props(ui.muted)}>No layers yet. Drag a shape onto the canvas.</p>;
+  if (!layers.length) return <FieldDescription>No layers yet. Drag a shape onto the canvas.</FieldDescription>;
 
   return (
     <>
-      <ol {...stylex.props(styles.list)}>
+      <ol className="m-0 flex list-none flex-col gap-[3px] p-0">
         {layers
           .map((layer, index) => ({ layer, index }))
           .reverse()
@@ -47,75 +50,42 @@ export function LayersPanel({ api }: { api: CompositeApi }) {
                 setOverId(null);
               }}
               onClick={() => api.select(layer.id === api.selectedId ? null : layer.id)}
-              {...stylex.props(
-                styles.item,
-                layer.id === api.selectedId && styles.selected,
-                dragId === layer.id && styles.dragging,
-                overId === layer.id && dragId !== layer.id && styles.over,
+              className={cn(
+                "flex cursor-grab items-center gap-2 rounded-sm border-2 border-transparent bg-secondary p-1.5 select-none hover:bg-accent",
+                layer.id === api.selectedId && "border-ring bg-accent",
+                dragId === layer.id && "opacity-40",
+                overId === layer.id && dragId !== layer.id && "border-t-gold",
               )}
             >
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="icon-sm"
                 aria-label={layer.visible ? `Hide ${layer.name}` : `Show ${layer.name}`}
                 aria-pressed={layer.visible}
                 onClick={e => {
                   e.stopPropagation();
                   api.updateLayer(layer.id, l => ({ ...l, visible: !l.visible }));
                 }}
-                {...stylex.props(styles.eye, !layer.visible && styles.eyeOff)}
+                className={cn(!layer.visible && "text-muted-foreground")}
               >
-                {layer.visible ? "◉" : "○"}
-              </button>
+                {layer.visible ? <EyeIcon /> : <EyeOffIcon />}
+              </Button>
               <LayerThumb layer={layer} />
-              <span {...stylex.props(styles.text)}>
-                <b {...stylex.props(styles.name)}>{layer.name}</b>
-                <span {...stylex.props(styles.desc)}>{describeLayer(layer)}</span>
+              <span className="flex min-w-0 grow flex-col">
+                <b className="truncate text-[13px] text-foreground">{layer.name}</b>
+                <span className="truncate text-[11px] text-muted-foreground">{describeLayer(layer)}</span>
               </span>
-              <span {...stylex.props(styles.badges)}>
-                {!layer.visible && <span {...stylex.props(ui.badge)}>hidden</span>}
+              <span className="flex flex-col items-end gap-0.5">
+                {!layer.visible && <Badge>hidden</Badge>}
                 {isOffCanvas(layer, canvas) && (layer.kind !== "eraser" || layer.cells.length > 0) && (
-                  <span {...stylex.props(ui.badge, ui.warn)}>off canvas</span>
+                  <Badge variant="destructive">off canvas</Badge>
                 )}
-                {layer.kind === "eraser" && !layer.cells.length && <span {...stylex.props(ui.badge)}>empty</span>}
+                {layer.kind === "eraser" && !layer.cells.length && <Badge>empty</Badge>}
               </span>
             </li>
           ))}
       </ol>
-      <p {...stylex.props(ui.muted)}>Top layer first. Each layer sees only the layers below it. Drag rows to reorder.</p>
+      <FieldDescription>Top layer first. Each layer sees only the layers below it. Drag rows to reorder.</FieldDescription>
     </>
   );
 }
-
-const styles = stylex.create({
-  list: { listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 3 },
-  item: {
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-    padding: 6,
-    borderRadius: 3,
-    borderWidth: 2,
-    borderStyle: "solid",
-    borderColor: "transparent",
-    backgroundColor: { default: colors.panelSunk, ":hover": colors.panelRaised },
-    cursor: "grab",
-    userSelect: "none",
-  },
-  selected: { borderColor: colors.diamond, backgroundColor: colors.panelRaised },
-  dragging: { opacity: 0.4 },
-  over: { borderTopColor: colors.gold },
-  eye: {
-    width: 22,
-    padding: 0,
-    borderWidth: 0,
-    backgroundColor: "transparent",
-    color: { default: colors.inkSoft, ":hover": colors.ink },
-    fontSize: 16,
-    cursor: "pointer",
-  },
-  eyeOff: { color: colors.inkFaint },
-  text: { display: "flex", flexDirection: "column", flexGrow: 1, minWidth: 0 },
-  name: { fontSize: 13, color: colors.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
-  desc: { fontSize: 11, color: colors.inkFaint, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
-  badges: { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 },
-});

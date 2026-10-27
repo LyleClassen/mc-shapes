@@ -1,7 +1,10 @@
-import * as stylex from "@stylexjs/stylex";
 import { useEffect, useRef, useState } from "react";
 import { layerGrid, type Layer } from "../../composite/composite";
-import { colors, fonts } from "../../theme/tokens.stylex";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 
 /**
  * A whole-number field. While typing, only values inside min–max are sent,
@@ -24,9 +27,9 @@ export function NumberField({
   const [draft, setDraft] = useState<string | null>(null);
   const clamp = (v: number) => Math.min(max, Math.max(min, Math.round(v)));
   return (
-    <label {...stylex.props(styles.field)}>
+    <Label className="gap-1.5 font-mono text-xs text-muted-foreground">
       <span>{label}</span>
-      <input
+      <Input
         type="number"
         step={1}
         min={Number.isFinite(min) ? min : undefined}
@@ -42,9 +45,9 @@ export function NumberField({
           if (Number.isFinite(v) && clamp(v) !== value) onChange(clamp(v));
           setDraft(null);
         }}
-        {...stylex.props(styles.input, styles.numberInput)}
+        className="w-[68px] font-mono"
       />
-    </label>
+    </Label>
   );
 }
 
@@ -64,22 +67,21 @@ export function Segmented<T extends string>({
   disabled?: readonly T[];
   title?: string;
 }) {
-  return (
-    <span role="radiogroup" aria-label={label} title={title} {...stylex.props(styles.segmented)}>
+  const group = (
+    <ToggleGroup aria-label={label} spacing={0} value={[value]} onValueChange={v => v[0] && onChange(v[0] as T)}>
       {options.map(([v, text]) => (
-        <button
-          key={v}
-          type="button"
-          role="radio"
-          aria-checked={value === v}
-          disabled={disabled.includes(v)}
-          onClick={() => onChange(v)}
-          {...stylex.props(styles.button, styles.segment, value === v && styles.on)}
-        >
+        <ToggleGroupItem key={v} value={v} disabled={disabled.includes(v)}>
           {text}
-        </button>
+        </ToggleGroupItem>
       ))}
-    </span>
+    </ToggleGroup>
+  );
+  if (!title) return group;
+  return (
+    <Tooltip>
+      <TooltipTrigger render={group} />
+      <TooltipContent>{title}</TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -113,83 +115,7 @@ export function LayerThumb({ layer, size = 32 }: { layer: Layer; size?: number }
       ref={ref}
       aria-hidden
       style={{ width: size, height: size }}
-      {...stylex.props(styles.thumb, !layer.visible && styles.thumbHidden)}
+      className={cn("block shrink-0 rounded-[2px] bg-secondary", !layer.visible && "opacity-35")}
     />
   );
 }
-
-export const styles = stylex.create({
-  stack: { display: "flex", flexDirection: "column", gap: 12 },
-  row: { display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8 },
-  grow: { flexGrow: 1, minWidth: 0 },
-  label: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 6,
-    fontSize: 13,
-    fontWeight: 800,
-    color: colors.inkSoft,
-  },
-  field: {
-    display: "flex",
-    alignItems: "center",
-    gap: 6,
-    fontFamily: fonts.mono,
-    fontSize: 12,
-    fontWeight: 800,
-    color: colors.inkFaint,
-  },
-  input: {
-    paddingBlock: 6,
-    paddingInline: 8,
-    borderWidth: 2,
-    borderStyle: "solid",
-    borderColor: { default: colors.line, ":focus": colors.diamond },
-    borderRadius: 3,
-    outline: "none",
-    backgroundColor: colors.panelSunk,
-    color: colors.ink,
-    fontFamily: fonts.body,
-    fontSize: 13,
-    fontWeight: 700,
-  },
-  numberInput: { width: 68, fontFamily: fonts.mono },
-  button: {
-    paddingBlock: 6,
-    paddingInline: 10,
-    borderWidth: 2,
-    borderStyle: "solid",
-    borderColor: colors.line,
-    borderRadius: 3,
-    backgroundColor: { default: colors.panelSunk, ":hover": colors.panelRaised },
-    color: colors.inkSoft,
-    fontFamily: fonts.body,
-    fontSize: 12,
-    fontWeight: 800,
-    whiteSpace: "nowrap",
-    cursor: { default: "pointer", ":disabled": "not-allowed" },
-    opacity: { default: 1, ":disabled": 0.4 },
-  },
-  on: { borderColor: colors.diamond, color: colors.diamond },
-  danger: { color: colors.redstone },
-  segmented: { display: "inline-flex" },
-  segment: {
-    borderRadius: 0,
-    marginLeft: { default: -2, ":first-child": 0 },
-  },
-  muted: { margin: 0, fontSize: 12, lineHeight: 1.45, color: colors.inkFaint },
-  badge: {
-    paddingBlock: 1,
-    paddingInline: 5,
-    borderRadius: 3,
-    backgroundColor: colors.panelSunk,
-    color: colors.inkFaint,
-    fontSize: 10,
-    fontWeight: 900,
-    textTransform: "uppercase",
-    whiteSpace: "nowrap",
-  },
-  warn: { backgroundColor: colors.redstone, color: colors.skyDeep },
-  thumb: { display: "block", flexShrink: 0, borderRadius: 2, backgroundColor: colors.panelSunk },
-  thumbHidden: { opacity: 0.35 },
-});

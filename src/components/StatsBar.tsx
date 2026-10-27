@@ -1,5 +1,5 @@
-import * as stylex from "@stylexjs/stylex";
-import { colors, fonts } from "../theme/tokens.stylex";
+import { Card, CardDescription } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 interface Props {
   blocks: number;
@@ -23,7 +23,7 @@ export function StatsBar({ blocks, solidBlocks, width, height }: Props) {
   const saved = solidBlocks - blocks;
 
   return (
-    <div {...stylex.props(styles.bar)}>
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-2.5">
       <Tile label="Blocks" value={blocks.toLocaleString()} tone="gold" big />
       <Tile label="Stacks of 64" value={describeStacks(blocks)} tone="grass" />
       <Tile label="Footprint" value={`${width} × ${height}`} tone="diamond" />
@@ -36,57 +36,26 @@ export function StatsBar({ blocks, solidBlocks, width, height }: Props) {
   );
 }
 
+const tones = {
+  gold: "text-gold",
+  grass: "text-grass",
+  diamond: "text-diamond",
+  amethyst: "text-amethyst",
+} as const;
+
 function Tile({ label, value, tone, big }: { label: string; value: string; tone: keyof typeof tones; big?: boolean }) {
   return (
-    <div {...stylex.props(styles.tile)}>
-      <span {...stylex.props(styles.label)}>{label}</span>
-      <span {...stylex.props(styles.value, tones[tone], big && styles.big)}>{value}</span>
-    </div>
+    <Card size="sm">
+      <CardDescription>{label}</CardDescription>
+      <span
+        className={cn(
+          "font-pixel text-[13px] leading-[1.5] tabular-nums",
+          tones[tone],
+          big && "text-xl leading-[1.5] [text-shadow:3px_3px_0_var(--gold-dark)]",
+        )}
+      >
+        {value}
+      </span>
+    </Card>
   );
 }
-
-const styles = stylex.create({
-  bar: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
-    gap: 10,
-  },
-  tile: {
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "space-between",
-    gap: 8,
-    paddingBlock: 12,
-    paddingInline: 14,
-    backgroundColor: colors.panel,
-    borderWidth: 3,
-    borderStyle: "solid",
-    borderColor: colors.line,
-    borderRadius: 6,
-    boxShadow: `4px 4px 0 ${colors.shadow}`,
-  },
-  label: {
-    fontSize: 12,
-    fontWeight: 800,
-    letterSpacing: "0.03em",
-    textTransform: "uppercase",
-    color: colors.inkFaint,
-  },
-  value: {
-    fontFamily: fonts.pixel,
-    fontSize: 13,
-    lineHeight: 1.5,
-    fontVariantNumeric: "tabular-nums",
-  },
-  big: {
-    fontSize: 20,
-    textShadow: `3px 3px 0 ${colors.goldDark}`,
-  },
-});
-
-const tones = stylex.create({
-  gold: { color: colors.gold },
-  grass: { color: colors.grass },
-  diamond: { color: colors.diamond },
-  amethyst: { color: colors.amethyst },
-});

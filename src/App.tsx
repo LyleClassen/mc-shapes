@@ -1,4 +1,4 @@
-import * as stylex from "@stylexjs/stylex";
+import { CheckIcon, CopyIcon } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { BlockStage, type Cell } from "./components/BlockStage";
 import { CompositeMode } from "./components/composite/CompositeMode";
@@ -16,7 +16,10 @@ import { highlight, highlightParam, isHighlightMode, type HighlightMode } from "
 import { countBlocks, isFilled, rowCount, trim, trimOffset, type Grid } from "./shapes/grid";
 import { getShape, SHAPES } from "./shapes";
 import { defaultValues, resolveValues, type ParamValue, type ParamValues } from "./shapes/types";
-import { colors, fonts } from "./theme/tokens.stylex";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import { useSessionState } from "./useSessionState";
 
 type Mode = "shapes" | "composite";
@@ -79,118 +82,119 @@ export function App() {
   const blocks = countBlocks(grid);
 
   return (
-    <div {...stylex.props(styles.page)}>
-      <header {...stylex.props(styles.header)}>
-        <div {...stylex.props(styles.logo)} aria-hidden>
-          <span {...stylex.props(styles.logoBlock, styles.logoGrass)} />
-          <span {...stylex.props(styles.logoBlock, styles.logoGold)} />
-          <span {...stylex.props(styles.logoBlock, styles.logoDiamond)} />
-        </div>
-        <div>
-          <h1 {...stylex.props(styles.title)}>Shape Crafter</h1>
-          <p {...stylex.props(styles.tagline)}>Plan circles, triangles and more — block by block.</p>
-        </div>
-        <div role="tablist" aria-label="Mode" {...stylex.props(styles.modes)}>
-          {(["shapes", "composite"] as const).map(m => (
-            <button
-              key={m}
-              type="button"
-              role="tab"
-              aria-selected={mode === m}
-              onClick={() => setMode(m)}
-              {...stylex.props(styles.mode, mode === m && styles.modeOn)}
-            >
-              {m === "shapes" ? "Shapes" : "Composite"}
-            </button>
-          ))}
-        </div>
-      </header>
-
-      {/* Kept mounted so the composite's undo history survives a trip to Shapes mode. */}
-      <div hidden={mode !== "composite"}>
-        <CompositeMode
-          active={mode === "composite"}
-          view={{ skinId, setSkinId, highlightMode, setHighlightMode, patternColors, setPatternColors }}
-        />
-      </div>
-
-      {mode === "shapes" && (
-        <main {...stylex.props(styles.layout)}>
-          <aside {...stylex.props(styles.sidebar)}>
-            <Panel title="Shape" accent="grass">
-              <ShapePicker shapes={SHAPES} selected={shapeId} onSelect={setShapeId} />
-            </Panel>
-
-            <Panel title={shape.name} accent="gold">
-              <p {...stylex.props(styles.description)}>{shape.description}</p>
-              <ParamControls params={shape.params} values={values} onChange={setParam} />
-              <ParamControls
-                params={[guideParam(center)]}
-                values={{ guides: effectiveGuideMode(guideMode, center) }}
-                onChange={(_, value) => setGuideMode(value as GuideMode)}
-              />
-              {shape.tip && (
-                <p {...stylex.props(styles.tip)}>
-                  <b {...stylex.props(styles.tipLabel)}>Tip</b> {shape.tip}
-                </p>
-              )}
-            </Panel>
-
-            <Panel title="Fill & block" accent="amethyst">
-              <ParamControls
-                params={fillParams}
-                values={fill}
-                onChange={(key, value) => setFillInput(prev => ({ ...prev, [key]: value }))}
-              />
-              <ParamControls
-                params={[highlightParam]}
-                values={{ highlight: highlightMode }}
-                onChange={(_, value) => setHighlightMode(value as HighlightMode)}
-              />
-              <PatternLegend highlight={outline} mode={highlightMode} custom={patternColors} onChange={setPatternColors} />
-              <SkinPicker skins={SKINS} selected={skinId} onSelect={setSkinId} />
-            </Panel>
-          </aside>
-
-          <section {...stylex.props(styles.center)}>
-            <StatsBar blocks={blocks} solidBlocks={countBlocks(solid)} width={grid.width} height={grid.height} />
-            <BlockStage
-              grid={grid}
-              center={center}
-              guides={guideCells(guideMode, center)}
-              highlight={outline}
-              skin={getSkin(skinId)}
-              highlightRow={highlightRow}
-              doneRows={doneRows}
-              hover={hover}
-              onHover={setHover}
-            />
-          </section>
-
-          <Panel
-            title="Row guide"
-            accent="diamond"
-            xstyle={styles.rows}
-            action={<CopyButton text={() => planText(shape.name, values, fill, grid)} />}
-          >
-            <p {...stylex.props(styles.legend)}>
-              <span {...stylex.props(styles.legendGap)}>·4</span> skip 4 ·{" "}
-              <span {...stylex.props(styles.legendFill)}>3</span> place 3 · click a row to tick it off
-              {doneRows.size > 0 && ` · ${doneRows.size}/${grid.height} done`}
+    <TooltipProvider>
+      <div className="mx-auto flex max-w-[1600px] flex-col gap-6 px-7 py-7 max-phone:px-4">
+        <header className="flex flex-wrap items-center gap-[18px]">
+          <div className="flex items-end gap-1" aria-hidden>
+            <span className={cn(LOGO_BLOCK, "bg-grass")} />
+            <span className={cn(LOGO_BLOCK, "h-[30px] bg-gold [animation-delay:0.3s]")} />
+            <span className={cn(LOGO_BLOCK, "bg-diamond [animation-delay:0.6s]")} />
+          </div>
+          <div>
+            <h1 className="m-0 font-pixel font-bold text-[28px] leading-[1.3] text-foreground [text-shadow:3px_3px_0_var(--redstone),6px_6px_0_var(--shadow)] max-phone:text-lg">
+              Shape Crafter
+            </h1>
+            <p className="mt-2 mb-0 text-[15px] font-bold text-secondary-foreground">
+              Plan circles, triangles and more — block by block.
             </p>
-            <RowGuide
-              grid={grid}
-              highlightRow={highlightRow}
-              doneRows={doneRows}
-              onHoverRow={setListRow}
-              onToggleRow={toggleRow}
-            />
-          </Panel>
-        </main>
-      )}
-    </div>
+          </div>
+          <Tabs className="ml-auto" value={mode} onValueChange={v => setMode(v as Mode)}>
+            <TabsList aria-label="Mode">
+              <TabsTrigger value="shapes">Shapes</TabsTrigger>
+              <TabsTrigger value="composite">Composite</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </header>
+
+        {/* Kept mounted so the composite's undo history survives a trip to Shapes mode. */}
+        <div hidden={mode !== "composite"}>
+          <CompositeMode
+            active={mode === "composite"}
+            view={{ skinId, setSkinId, highlightMode, setHighlightMode, patternColors, setPatternColors }}
+          />
+        </div>
+
+        {mode === "shapes" && (
+          <main className="grid grid-cols-[340px_minmax(0,1fr)_320px] items-start gap-5 max-narrow:grid-cols-[320px_minmax(0,1fr)] max-phone:grid-cols-[minmax(0,1fr)]">
+            <aside className="flex min-w-0 flex-col gap-5">
+              <Panel title="Shape" accent="grass">
+                <ShapePicker shapes={SHAPES} selected={shapeId} onSelect={setShapeId} />
+              </Panel>
+
+              <Panel title={shape.name} accent="gold">
+                <p className="m-0 text-sm text-secondary-foreground">{shape.description}</p>
+                <ParamControls params={shape.params} values={values} onChange={setParam} />
+                <ParamControls
+                  params={[guideParam(center)]}
+                  values={{ guides: effectiveGuideMode(guideMode, center) }}
+                  onChange={(_, value) => setGuideMode(value as GuideMode)}
+                />
+                {shape.tip && (
+                  <p className="m-0 rounded-[4px] border-l-4 border-gold bg-secondary px-3 py-2.5 text-[13px] leading-[1.45] text-secondary-foreground">
+                    <b className="mr-1.5 font-pixel text-[9px] text-gold">Tip</b> {shape.tip}
+                  </p>
+                )}
+              </Panel>
+
+              <Panel title="Fill & block" accent="amethyst">
+                <ParamControls
+                  params={fillParams}
+                  values={fill}
+                  onChange={(key, value) => setFillInput(prev => ({ ...prev, [key]: value }))}
+                />
+                <ParamControls
+                  params={[highlightParam]}
+                  values={{ highlight: highlightMode }}
+                  onChange={(_, value) => setHighlightMode(value as HighlightMode)}
+                />
+                <PatternLegend highlight={outline} mode={highlightMode} custom={patternColors} onChange={setPatternColors} />
+                <SkinPicker skins={SKINS} selected={skinId} onSelect={setSkinId} />
+              </Panel>
+            </aside>
+
+            <section className="flex min-w-0 flex-col gap-3.5">
+              <StatsBar blocks={blocks} solidBlocks={countBlocks(solid)} width={grid.width} height={grid.height} />
+              <BlockStage
+                grid={grid}
+                center={center}
+                guides={guideCells(guideMode, center)}
+                highlight={outline}
+                skin={getSkin(skinId)}
+                highlightRow={highlightRow}
+                doneRows={doneRows}
+                hover={hover}
+                onHover={setHover}
+              />
+            </section>
+
+            <Panel
+              title="Row guide"
+              accent="diamond"
+              className="max-narrow:col-span-full"
+              action={<CopyButton text={() => planText(shape.name, values, fill, grid)} />}
+            >
+              <p className="m-0 text-xs text-muted-foreground">
+                <span className="font-mono font-bold">·4</span> skip 4 ·{" "}
+                <span className="rounded-[2px] bg-grass px-1 font-mono font-bold text-sky-deep">3</span> place 3 · click a row to tick it off
+                {doneRows.size > 0 && ` · ${doneRows.size}/${grid.height} done`}
+              </p>
+              <RowGuide
+                grid={grid}
+                highlightRow={highlightRow}
+                doneRows={doneRows}
+                onHoverRow={setListRow}
+                onToggleRow={toggleRow}
+              />
+            </Panel>
+          </main>
+        )}
+      </div>
+    </TooltipProvider>
   );
 }
+
+const LOGO_BLOCK =
+  "h-[22px] w-[22px] animate-bob border-[3px] border-shadow shadow-[inset_4px_4px_0_rgba(255,255,255,0.35),inset_-4px_-4px_0_rgba(0,0,0,0.3)]";
 
 const EMPTY_SET: ReadonlySet<number> = new Set();
 
@@ -217,189 +221,18 @@ function planText(name: string, values: ParamValues, fill: ParamValues, grid: Gr
 function CopyButton({ text }: { text: () => string }) {
   const [copied, setCopied] = useState(false);
   return (
-    <button
-      type="button"
+    <Button
+      variant="outline"
+      size="sm"
+      data-copied={copied || undefined}
       onClick={async () => {
         await navigator.clipboard.writeText(text());
         setCopied(true);
         setTimeout(() => setCopied(false), 1400);
       }}
-      {...stylex.props(styles.copy, copied && styles.copied)}
     >
+      {copied ? <CheckIcon data-icon="inline-start" /> : <CopyIcon data-icon="inline-start" />}
       {copied ? "Copied!" : "Copy plan"}
-    </button>
+    </Button>
   );
 }
-
-const bob = stylex.keyframes({
-  "0%": { transform: "translateY(0)" },
-  "50%": { transform: "translateY(-5px)" },
-  "100%": { transform: "translateY(0)" },
-});
-
-const NARROW = "@media (max-width: 1180px)";
-const PHONE = "@media (max-width: 760px)";
-
-const styles = stylex.create({
-  page: {
-    maxWidth: 1600,
-    marginInline: "auto",
-    paddingBlock: 28,
-    paddingInline: { default: 28, [PHONE]: 16 },
-    display: "flex",
-    flexDirection: "column",
-    gap: 24,
-  },
-  header: {
-    display: "flex",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: 18,
-  },
-  modes: {
-    marginLeft: "auto",
-    display: "flex",
-    gap: 4,
-    padding: 4,
-    borderRadius: 6,
-    borderWidth: 3,
-    borderStyle: "solid",
-    borderColor: colors.line,
-    backgroundColor: colors.panelSunk,
-  },
-  mode: {
-    paddingBlock: 9,
-    paddingInline: { default: 16, [PHONE]: 10 },
-    borderWidth: 0,
-    borderRadius: 3,
-    backgroundColor: { default: "transparent", ":hover": colors.panelRaised },
-    color: colors.inkSoft,
-    fontFamily: fonts.pixel,
-    fontSize: { default: 10, [PHONE]: 8 },
-    cursor: "pointer",
-  },
-  modeOn: {
-    backgroundColor: { default: colors.gold, ":hover": colors.gold },
-    color: colors.skyDeep,
-  },
-  logo: {
-    display: "flex",
-    alignItems: "flex-end",
-    gap: 4,
-  },
-  logoBlock: {
-    width: 22,
-    height: 22,
-    borderWidth: 3,
-    borderStyle: "solid",
-    borderColor: colors.shadow,
-    boxShadow: "inset 4px 4px 0 rgba(255,255,255,0.35), inset -4px -4px 0 rgba(0,0,0,0.3)",
-    animationName: bob,
-    animationDuration: "2.4s",
-    animationIterationCount: "infinite",
-    animationTimingFunction: "steps(4)",
-  },
-  logoGrass: { backgroundColor: colors.grass },
-  logoGold: { backgroundColor: colors.gold, animationDelay: "0.3s", height: 30 },
-  logoDiamond: { backgroundColor: colors.diamond, animationDelay: "0.6s" },
-  title: {
-    margin: 0,
-    fontFamily: fonts.pixel,
-    fontSize: { default: 28, [PHONE]: 18 },
-    lineHeight: 1.3,
-    color: colors.ink,
-    textShadow: `3px 3px 0 ${colors.redstone}, 6px 6px 0 ${colors.shadow}`,
-  },
-  tagline: {
-    marginTop: 8,
-    marginBottom: 0,
-    fontSize: 15,
-    fontWeight: 700,
-    color: colors.inkSoft,
-  },
-  layout: {
-    display: "grid",
-    gridTemplateColumns: {
-      default: "340px minmax(0, 1fr) 320px",
-      [NARROW]: "320px minmax(0, 1fr)",
-      [PHONE]: "minmax(0, 1fr)",
-    },
-    alignItems: "start",
-    gap: 20,
-  },
-  sidebar: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 20,
-    minWidth: 0,
-  },
-  center: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 14,
-    minWidth: 0,
-  },
-  rows: {
-    gridColumn: { default: "auto", [NARROW]: "1 / -1" },
-  },
-  description: {
-    margin: 0,
-    fontSize: 14,
-    color: colors.inkSoft,
-  },
-  tip: {
-    margin: 0,
-    paddingBlock: 10,
-    paddingInline: 12,
-    borderRadius: 4,
-    borderLeftWidth: 4,
-    borderLeftStyle: "solid",
-    borderLeftColor: colors.gold,
-    backgroundColor: colors.panelSunk,
-    fontSize: 13,
-    lineHeight: 1.45,
-    color: colors.inkSoft,
-  },
-  tipLabel: {
-    marginRight: 6,
-    fontFamily: fonts.pixel,
-    fontSize: 9,
-    color: colors.gold,
-  },
-  legend: {
-    margin: 0,
-    fontSize: 12,
-    color: colors.inkFaint,
-  },
-  legendGap: {
-    fontFamily: fonts.mono,
-    fontWeight: 700,
-  },
-  legendFill: {
-    fontFamily: fonts.mono,
-    fontWeight: 700,
-    paddingInline: 4,
-    borderRadius: 2,
-    backgroundColor: colors.grass,
-    color: colors.skyDeep,
-  },
-  copy: {
-    paddingBlock: 5,
-    paddingInline: 10,
-    borderWidth: 2,
-    borderStyle: "solid",
-    borderColor: colors.diamond,
-    borderRadius: 3,
-    backgroundColor: { default: "transparent", ":hover": colors.diamondDark },
-    color: colors.diamond,
-    fontFamily: fonts.body,
-    fontSize: 12,
-    fontWeight: 800,
-    cursor: "pointer",
-    whiteSpace: "nowrap",
-  },
-  copied: {
-    backgroundColor: { default: colors.diamond, ":hover": colors.diamond },
-    color: colors.skyDeep,
-  },
-});

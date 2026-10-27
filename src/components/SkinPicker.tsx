@@ -1,6 +1,6 @@
-import * as stylex from "@stylexjs/stylex";
 import type { Skin } from "../render/skins";
-import { colors } from "../theme/tokens.stylex";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface Props {
   skins: readonly Skin[];
@@ -10,51 +10,28 @@ interface Props {
 
 export function SkinPicker({ skins, selected, onSelect }: Props) {
   return (
-    <div {...stylex.props(styles.row)} role="radiogroup" aria-label="Block">
+    <ToggleGroup
+      aria-label="Block"
+      variant="swatch"
+      spacing={2}
+      className="flex-wrap"
+      value={[selected]}
+      onValueChange={v => v[0] && onSelect(v[0])}
+    >
       {skins.map(skin => (
-        <button
-          key={skin.id}
-          type="button"
-          role="radio"
-          aria-checked={skin.id === selected}
-          aria-label={skin.name}
-          title={skin.name}
-          onClick={() => onSelect(skin.id)}
-          {...stylex.props(styles.swatch, styles.paint(skin.face, skin.light, skin.dark), skin.id === selected && styles.on)}
-        />
+        <Tooltip key={skin.id}>
+          <TooltipTrigger
+            render={
+              <ToggleGroupItem
+                value={skin.id}
+                aria-label={skin.name}
+                style={{ backgroundColor: skin.face, boxShadow: `inset 4px 4px 0 ${skin.light}, inset -4px -4px 0 ${skin.dark}` }}
+              />
+            }
+          />
+          <TooltipContent>{skin.name}</TooltipContent>
+        </Tooltip>
       ))}
-    </div>
+    </ToggleGroup>
   );
 }
-
-const styles = stylex.create({
-  row: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  swatch: {
-    width: 34,
-    height: 34,
-    padding: 0,
-    borderWidth: 3,
-    borderStyle: "solid",
-    borderColor: colors.shadow,
-    borderRadius: 2,
-    cursor: "pointer",
-    transform: { default: null, ":hover": "translateY(-2px) rotate(-4deg)" },
-    transitionProperty: "transform",
-    transitionDuration: "120ms",
-  },
-  paint: (face: string, light: string, dark: string) => ({
-    backgroundColor: face,
-    boxShadow: `inset 4px 4px 0 ${light}, inset -4px -4px 0 ${dark}`,
-  }),
-  on: {
-    borderColor: colors.gold,
-    transform: { default: "translateY(-3px)", ":hover": "translateY(-3px)" },
-    outlineWidth: 2,
-    outlineStyle: "solid",
-    outlineColor: colors.shadow,
-  },
-});

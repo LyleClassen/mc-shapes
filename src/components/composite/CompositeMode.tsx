@@ -1,4 +1,4 @@
-import * as stylex from "@stylexjs/stylex";
+import { ChevronRightIcon } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { flatten } from "../../composite/composite";
 import { useComposite } from "../../composite/useComposite";
@@ -6,7 +6,6 @@ import { getSkin, SKINS } from "../../render/skins";
 import { countBlocks, type Grid } from "../../shapes/grid";
 import { highlight, highlightParam, type HighlightMode } from "../../shapes/patterns";
 import type { Point } from "../../shapes/raster";
-import { colors, fonts } from "../../theme/tokens.stylex";
 import { Panel } from "../Panel";
 import { ParamControls } from "../ParamControls";
 import { PatternLegend, recolour } from "../PatternLegend";
@@ -17,6 +16,8 @@ import { CompositeStage } from "./CompositeStage";
 import { CompositeToolbar, EraserOptions } from "./CompositeToolbar";
 import { LayerSettings, CanvasSettings } from "./LayerSettings";
 import { LayersPanel } from "./LayersPanel";
+import { Card } from "@/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 /** View settings shared with Shapes mode. None of them are undoable. */
 export interface SharedView {
@@ -41,7 +42,6 @@ export function CompositeMode({ active, view }: { active: boolean; view: SharedV
   const outline = useMemo(() => recolour(traced, view.patternColors), [traced, view.patternColors]);
 
   const [hover, setHover] = useState<Point | null>(null);
-  const [guideOpen, setGuideOpen] = useState(false);
   const [listRow, setListRow] = useState<number | null>(null);
   const [done, setDone] = useState<{ plan: Grid | null; rows: ReadonlySet<number> }>({ plan: null, rows: new Set() });
 
@@ -66,11 +66,11 @@ export function CompositeMode({ active, view }: { active: boolean; view: SharedV
   const blocks = countBlocks(grid);
 
   return (
-    <div {...stylex.props(styles.page)}>
+    <div className="flex flex-col gap-4">
       <CompositeToolbar api={api} />
 
-      <div {...stylex.props(styles.layout)}>
-        <aside {...stylex.props(styles.column)}>
+      <div className="grid grid-cols-[330px_minmax(0,1fr)_300px] items-start gap-5 max-narrow:grid-cols-[300px_minmax(0,1fr)] max-phone:grid-cols-[minmax(0,1fr)]">
+        <aside className="flex min-w-0 flex-col gap-5">
           <Panel title={api.selected ? api.selected.name || "Layer" : "Canvas"} accent="gold">
             {api.selected ? <LayerSettings key={api.selected.id} api={api} layer={api.selected} /> : <CanvasSettings api={api} />}
           </Panel>
@@ -91,7 +91,7 @@ export function CompositeMode({ active, view }: { active: boolean; view: SharedV
           </Panel>
         </aside>
 
-        <section {...stylex.props(styles.center)}>
+        <section className="flex min-w-0 flex-col gap-3.5">
           {api.tool === "eraser" && <EraserOptions api={api} />}
           <CompositeStage
             api={api}
@@ -103,35 +103,34 @@ export function CompositeMode({ active, view }: { active: boolean; view: SharedV
             onHover={setHover}
           />
           <StatsBar blocks={blocks} solidBlocks={blocks} width={grid.width} height={grid.height} />
-          <details onToggle={e => setGuideOpen(e.currentTarget.open)} {...stylex.props(styles.details)}>
-            <summary {...stylex.props(styles.summary)}>
+          <Collapsible render={<Card className="gap-0 px-4 py-3" />}>
+            <CollapsibleTrigger className="group/trigger flex w-full items-center gap-2.5 text-left font-pixel text-[11px] leading-[1.4] text-foreground uppercase">
+              <ChevronRightIcon className="size-3.5 transition-transform group-data-panel-open/trigger:rotate-90" />
               Row guide
-              <span {...stylex.props(styles.count)}>
+              <span className="font-sans text-xs font-bold text-muted-foreground normal-case">
                 {grid.height ? `${grid.height} rows` : "no blocks yet"}
                 {doneRows.size > 0 && ` · ${doneRows.size}/${grid.height} done`}
               </span>
-            </summary>
-            {/* Only rendered while open: every row re-renders on each drag move. */}
-            {guideOpen && (
-              <div {...stylex.props(styles.guide)}>
-                <p {...stylex.props(styles.legend)}>
-                  <span {...stylex.props(styles.legendGap)}>·4</span> skip 4 ·{" "}
-                  <span {...stylex.props(styles.legendFill)}>3</span> place 3 · rows count from the top of the
-                  trimmed plan · click a row to tick it off
-                </p>
-                <RowGuide
-                  grid={grid}
-                  highlightRow={planRow}
-                  doneRows={doneRows}
-                  onHoverRow={setListRow}
-                  onToggleRow={toggleRow}
-                />
-              </div>
-            )}
-          </details>
+            </CollapsibleTrigger>
+            {/* The panel unmounts while closed, which matters: every row re-renders on each drag move. */}
+            <CollapsibleContent className="mt-3 flex flex-col gap-2.5">
+              <p className="m-0 text-xs text-muted-foreground">
+                <span className="font-mono font-bold">·4</span> skip 4 ·{" "}
+                <span className="rounded-[2px] bg-grass px-1 font-mono font-bold text-sky-deep">3</span> place 3 · rows
+                count from the top of the trimmed plan · click a row to tick it off
+              </p>
+              <RowGuide
+                grid={grid}
+                highlightRow={planRow}
+                doneRows={doneRows}
+                onHoverRow={setListRow}
+                onToggleRow={toggleRow}
+              />
+            </CollapsibleContent>
+          </Collapsible>
         </section>
 
-        <Panel title="Layers" accent="diamond" xstyle={styles.layers}>
+        <Panel title="Layers" accent="diamond" className="max-narrow:col-span-full">
           <LayersPanel api={api} />
         </Panel>
       </div>
@@ -140,56 +139,3 @@ export function CompositeMode({ active, view }: { active: boolean; view: SharedV
 }
 
 const EMPTY_SET: ReadonlySet<number> = new Set();
-
-const NARROW = "@media (max-width: 1180px)";
-const PHONE = "@media (max-width: 760px)";
-
-const styles = stylex.create({
-  page: { display: "flex", flexDirection: "column", gap: 16 },
-  layout: {
-    display: "grid",
-    gridTemplateColumns: {
-      default: "330px minmax(0, 1fr) 300px",
-      [NARROW]: "300px minmax(0, 1fr)",
-      [PHONE]: "minmax(0, 1fr)",
-    },
-    alignItems: "start",
-    gap: 20,
-  },
-  column: { display: "flex", flexDirection: "column", gap: 20, minWidth: 0 },
-  center: { display: "flex", flexDirection: "column", gap: 14, minWidth: 0 },
-  layers: { gridColumn: { default: "auto", [NARROW]: "1 / -1" } },
-  details: {
-    paddingBlock: 12,
-    paddingInline: 16,
-    borderRadius: 6,
-    borderWidth: 3,
-    borderStyle: "solid",
-    borderColor: colors.line,
-    backgroundColor: colors.panel,
-    boxShadow: `5px 5px 0 ${colors.shadow}`,
-  },
-  summary: {
-    display: "flex",
-    alignItems: "center",
-    gap: 10,
-    fontFamily: fonts.pixel,
-    fontSize: 11,
-    lineHeight: 1.4,
-    textTransform: "uppercase",
-    color: colors.ink,
-    cursor: "pointer",
-  },
-  count: { fontFamily: fonts.body, fontSize: 12, fontWeight: 700, textTransform: "none", color: colors.inkFaint },
-  guide: { display: "flex", flexDirection: "column", gap: 10, marginTop: 12 },
-  legend: { margin: 0, fontSize: 12, color: colors.inkFaint },
-  legendGap: { fontFamily: fonts.mono, fontWeight: 700 },
-  legendFill: {
-    fontFamily: fonts.mono,
-    fontWeight: 700,
-    paddingInline: 4,
-    borderRadius: 2,
-    backgroundColor: colors.grass,
-    color: colors.skyDeep,
-  },
-});

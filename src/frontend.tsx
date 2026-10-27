@@ -8,10 +8,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
-// StyleX inlines token references at compile time, which leaves the named
-// imports unused so TypeScript elides them. Import for side effects so the
-// variable definitions are always injected.
-import "./theme/tokens.stylex";
 
 const elem = document.getElementById("root")!;
 const app = (

@@ -1,36 +1,156 @@
-/* Page-level basics that StyleX can't target (html/body). Components use StyleX. */
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* "Night in the Overworld": deep purple sky with ore-bright accents. The app
+   is dark-only, so there is a single palette on :root. */
+:root {
+  --sky: #17123d;
+  --sky-deep: #0c0924;
+  --panel: #251e5a;
+  --panel-raised: #332a77;
+  --panel-sunk: #1b1547;
+  --line: #4b3fa3;
+  --ink: #fff6df;
+  --ink-soft: #cbc2f5;
+  --ink-faint: #8f85c9;
+  --grass: #72e36c;
+  --grass-dark: #2f8a3b;
+  --gold: #ffd23f;
+  --gold-dark: #b9840f;
+  --diamond: #52f1e5;
+  --diamond-dark: #1a9e98;
+  --redstone: #ff5b7c;
+  --amethyst: #b98cff;
+  --shadow: #07051a;
+  /* The browser's dark range-input track, which the sliders reproduce. */
+  --range-track: #3b3b3b;
+  --range-edge: #858585;
+
+  --background: var(--sky);
+  --foreground: var(--ink);
+  --card: var(--panel);
+  --card-foreground: var(--ink);
+  --popover: var(--panel-raised);
+  --popover-foreground: var(--ink);
+  --primary: var(--grass);
+  --primary-foreground: var(--sky-deep);
+  --secondary: var(--panel-sunk);
+  --secondary-foreground: var(--ink-soft);
+  --muted: var(--panel-sunk);
+  --muted-foreground: var(--ink-faint);
+  --accent: var(--panel-raised);
+  --accent-foreground: var(--ink);
+  --destructive: var(--redstone);
+  --border: var(--line);
+  --input: var(--line);
+  --ring: var(--diamond);
+  --radius: 3px;
 }
 
-html {
-  color-scheme: dark;
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-sky: var(--sky);
+  --color-sky-deep: var(--sky-deep);
+  --color-panel: var(--panel);
+  --color-panel-raised: var(--panel-raised);
+  --color-panel-sunk: var(--panel-sunk);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-ink-faint: var(--ink-faint);
+  --color-grass: var(--grass);
+  --color-grass-dark: var(--grass-dark);
+  --color-gold: var(--gold);
+  --color-gold-dark: var(--gold-dark);
+  --color-diamond: var(--diamond);
+  --color-diamond-dark: var(--diamond-dark);
+  --color-redstone: var(--redstone);
+  --color-amethyst: var(--amethyst);
+  --color-shadow: var(--shadow);
+  --color-range-track: var(--range-track);
+  --color-range-edge: var(--range-edge);
+
+  --font-sans: "Nunito", ui-rounded, system-ui, sans-serif;
+  --font-pixel: "Press Start 2P", ui-monospace, monospace;
+  --font-mono: ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+  /* Font sizes keep the browser's normal line height, like the original design. */
+  --text-xs--line-height: normal;
+  --text-sm--line-height: normal;
+  --text-base--line-height: normal;
+  --text-lg--line-height: normal;
+  --text-xl--line-height: normal;
+
+  --radius-sm: var(--radius);
+  --radius-md: calc(var(--radius) * 2);
+  --radius-lg: calc(var(--radius) * 2);
+
+  --shadow-block: 5px 5px 0 var(--shadow);
+  --shadow-block-sm: 3px 3px 0 var(--shadow);
+  /* A raised block face: dark bottom-right edge, light top-left edge. */
+  --shadow-bevel: inset -3px -3px 0 rgba(0, 0, 0, 0.3), inset 3px 3px 0 rgba(255, 255, 255, 0.35);
+
+  /* max-narrow: / max-phone: match the old max-width 1180px / 760px queries. */
+  --breakpoint-narrow: 1181px;
+  --breakpoint-phone: 761px;
+
+  --animate-bob: bob 2.4s steps(4) infinite;
+  @keyframes bob {
+    0% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+    100% { transform: translateY(0); }
+  }
 }
 
-body {
-  margin: 0;
-  min-height: 100vh;
-  font-family: "Nunito", ui-rounded, system-ui, sans-serif;
-  color: #fff6df;
-  background-color: #17123d;
-  background-image:
-    radial-gradient(2px 2px at 12% 18%, #fff6df 50%, transparent 51%),
-    radial-gradient(2px 2px at 68% 8%, #cbc2f5 50%, transparent 51%),
-    radial-gradient(2px 2px at 88% 32%, #fff6df 50%, transparent 51%),
-    radial-gradient(2px 2px at 32% 62%, #cbc2f5 50%, transparent 51%),
-    radial-gradient(2px 2px at 52% 88%, #fff6df 50%, transparent 51%),
-    linear-gradient(180deg, #17123d 0%, #221758 60%, #2b1a5e 100%);
-  background-attachment: fixed;
-}
+@layer base {
+  html {
+    color-scheme: dark;
+    /* Preflight sets 1.5; the design was built on the browser default. */
+    line-height: normal;
+  }
 
-button,
-input {
-  font: inherit;
-}
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: var(--font-sans);
+    color: var(--ink);
+    background-color: var(--sky);
+    background-image:
+      radial-gradient(2px 2px at 12% 18%, #fff6df 50%, transparent 51%),
+      radial-gradient(2px 2px at 68% 8%, #cbc2f5 50%, transparent 51%),
+      radial-gradient(2px 2px at 88% 32%, #fff6df 50%, transparent 51%),
+      radial-gradient(2px 2px at 32% 62%, #cbc2f5 50%, transparent 51%),
+      radial-gradient(2px 2px at 52% 88%, #fff6df 50%, transparent 51%),
+      linear-gradient(180deg, #17123d 0%, #221758 60%, #2b1a5e 100%);
+    background-attachment: fixed;
+  }
 
-:focus-visible {
-  outline: 3px solid #ffd23f;
-  outline-offset: 2px;
+  button,
+  input,
+  select {
+    font: inherit;
+  }
+
+  :focus-visible {
+    outline: 3px solid var(--gold);
+    outline-offset: 2px;
+  }
 }

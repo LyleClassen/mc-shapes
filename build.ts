@@ -1,4 +1,4 @@
-import stylex from "./stylex-plugin";
+import tailwind from "bun-plugin-tailwind";
 
 const result = await Bun.build({
   entrypoints: ["./src/index.html"],
@@ -8,7 +8,7 @@ const result = await Bun.build({
   sourcemap: "linked",
   define: { "process.env.NODE_ENV": '"production"' },
   env: "BUN_PUBLIC_*",
-  plugins: [stylex],
+  plugins: [tailwind],
 });
 
 if (!result.success) {

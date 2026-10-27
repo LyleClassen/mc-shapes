@@ -1,4 +1,4 @@
-import * as stylex from "@stylexjs/stylex";
+import { MinusIcon, PlusIcon } from "lucide-react";
 import { useId } from "react";
 import {
   resolveHint,
@@ -11,7 +11,13 @@ import {
   type SelectParam,
   type ToggleParam,
 } from "../shapes/types";
-import { colors, fonts } from "../theme/tokens.stylex";
+import { Button } from "@/components/ui/button";
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { cn } from "@/lib/utils";
 
 interface Props {
   params: readonly ParamDef[];
@@ -22,7 +28,7 @@ interface Props {
 /** Renders controls for any shape's parameter list. */
 export function ParamControls({ params, values, onChange }: Props) {
   return (
-    <div {...stylex.props(styles.stack)}>
+    <FieldGroup>
       {params
         .filter(p => p.visible?.(values) ?? true)
         .map(p => {
@@ -36,7 +42,7 @@ export function ParamControls({ params, values, onChange }: Props) {
               return <SelectControl key={p.key} param={p} values={values} onChange={change} />;
           }
         })}
-    </div>
+    </FieldGroup>
   );
 }
 
@@ -60,30 +66,26 @@ function NumberControl({
   const snap = (v: number) => marks.find(m => Math.abs(m.value - v) <= Math.max(step, span / 72))?.value ?? v;
 
   return (
-    <div {...stylex.props(styles.field)}>
-      <div {...stylex.props(styles.labelRow)}>
-        <label htmlFor={id} {...stylex.props(styles.label)}>
-          {param.label}
-        </label>
-        <span {...stylex.props(styles.range)}>
+    <Field>
+      <div className="flex items-baseline justify-between gap-2">
+        <FieldLabel htmlFor={id}>{param.label}</FieldLabel>
+        <span className="font-mono text-[11px] text-muted-foreground">
           {param.min}–{max}
           {param.unit ? ` ${param.unit}` : ""}
         </span>
       </div>
-      <div {...stylex.props(styles.numberRow, marks.length > 0 && styles.numberRowMarked)}>
-        <button type="button" aria-label={`Decrease ${param.label}`} onClick={() => set(value - step)} {...stylex.props(styles.stepper)}>
-          −
-        </button>
-        <div {...stylex.props(styles.sliderWrap)}>
-          <input
-            type="range"
+      <div className={cn("flex items-center gap-1.5", marks.length > 0 && "pb-4")}>
+        <Button size="icon" aria-label={`Decrease ${param.label}`} onClick={() => set(value - step)}>
+          <MinusIcon />
+        </Button>
+        <div className="relative flex min-w-0 grow">
+          <Slider
             min={param.min}
             max={max}
             step={step}
             value={value}
             aria-label={param.label}
-            onChange={e => set(snap(Number(e.target.value)))}
-            {...stylex.props(styles.slider)}
+            onValueChange={v => set(snap(v as number))}
           />
           {marks.map(m => (
             <button
@@ -92,18 +94,21 @@ function NumberControl({
               tabIndex={-1}
               aria-hidden
               onClick={() => set(m.value)}
-              {...stylex.props(styles.mark, styles.markAt(span ? (m.value - param.min) / span : 0))}
+              className="absolute top-full flex -translate-x-1/2 cursor-pointer flex-col items-center gap-0.5 p-0 text-muted-foreground hover:text-foreground"
+              // Offsets by half the 16px thumb so a notch sits under the thumb's centre.
+              style={{ left: `calc(8px + (100% - 16px) * ${span ? (m.value - param.min) / span : 0})` }}
             >
-              <span {...stylex.props(styles.notch, m.value === value && styles.notchOn)} />
-              {m.label && <span {...stylex.props(styles.markLabel)}>{m.label}</span>}
+              <span className={cn("h-[5px] w-0.5 bg-current", m.value === value && "bg-grass")} />
+              {m.label && <span className="font-mono text-[9px] leading-none">{m.label}</span>}
             </button>
           ))}
         </div>
-        <button type="button" aria-label={`Increase ${param.label}`} onClick={() => set(value + step)} {...stylex.props(styles.stepper)}>
-          +
-        </button>
-        <input
+        <Button size="icon" aria-label={`Increase ${param.label}`} onClick={() => set(value + step)}>
+          <PlusIcon />
+        </Button>
+        <Input
           id={id}
+          variant="readout"
           type="number"
           min={param.min}
           max={max}
@@ -113,33 +118,26 @@ function NumberControl({
             const v = e.target.valueAsNumber;
             if (Number.isFinite(v)) set(v);
           }}
-          {...stylex.props(styles.numberInput)}
         />
       </div>
       <Hint param={param} values={values} />
-    </div>
+    </Field>
   );
 }
 
 function Hint({ param, values }: { param: ParamDef; values: ParamValues }) {
   const hint = resolveHint(param, values);
-  return hint ? <p {...stylex.props(styles.hint)}>{hint}</p> : null;
+  return hint ? <FieldDescription>{hint}</FieldDescription> : null;
 }
 
 function ToggleControl({ param, value, onChange }: { param: ToggleParam; value: boolean; onChange: (v: boolean) => void }) {
   return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={value}
-      onClick={() => onChange(!value)}
-      {...stylex.props(styles.toggleRow)}
-    >
-      <span {...stylex.props(styles.label)}>{param.label}</span>
-      <span {...stylex.props(styles.track, value && styles.trackOn)}>
-        <span {...stylex.props(styles.knob, value && styles.knobOn)} />
-      </span>
-    </button>
+    <Field orientation="horizontal">
+      <FieldLabel className="w-full cursor-pointer justify-between">
+        {param.label}
+        <Switch checked={value} onCheckedChange={onChange} />
+      </FieldLabel>
+    </Field>
   );
 }
 
@@ -152,211 +150,26 @@ function SelectControl({
   values: ParamValues;
   onChange: (v: string) => void;
 }) {
+  const id = useId();
   const value = String(values[param.key]);
   return (
-    <div {...stylex.props(styles.field)} role="radiogroup" aria-label={param.label}>
-      <span {...stylex.props(styles.label)}>{param.label}</span>
-      <div {...stylex.props(styles.segments)}>
+    <Field>
+      <FieldLabel id={id}>{param.label}</FieldLabel>
+      <ToggleGroup
+        aria-labelledby={id}
+        variant="segment"
+        spacing={1}
+        className="w-full flex-wrap rounded-[4px] bg-sky-deep p-[3px]"
+        value={[value]}
+        onValueChange={v => v[0] && onChange(v[0])}
+      >
         {param.options.map(o => (
-          <button
-            key={o.value}
-            type="button"
-            role="radio"
-            aria-checked={o.value === value}
-            onClick={() => onChange(o.value)}
-            {...stylex.props(styles.segment, o.value === value && styles.segmentOn)}
-          >
+          <ToggleGroupItem key={o.value} value={o.value}>
             {o.label}
-          </button>
+          </ToggleGroupItem>
         ))}
-      </div>
+      </ToggleGroup>
       <Hint param={param} values={values} />
-    </div>
+    </Field>
   );
 }
-
-const styles = stylex.create({
-  stack: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 14,
-  },
-  field: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 6,
-  },
-  labelRow: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "baseline",
-    gap: 8,
-  },
-  label: {
-    fontFamily: fonts.body,
-    fontSize: 14,
-    fontWeight: 800,
-    color: colors.ink,
-  },
-  range: {
-    fontFamily: fonts.mono,
-    fontSize: 11,
-    color: colors.inkFaint,
-  },
-  hint: {
-    margin: 0,
-    fontSize: 12,
-    color: colors.inkFaint,
-  },
-  numberRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: 6,
-  },
-  numberRowMarked: {
-    paddingBottom: 16,
-  },
-  sliderWrap: {
-    position: "relative",
-    display: "flex",
-    flexGrow: 1,
-    minWidth: 0,
-  },
-  slider: {
-    flexGrow: 1,
-    minWidth: 0,
-    marginInline: 0,
-    accentColor: colors.grass,
-    cursor: "pointer",
-  },
-  mark: {
-    position: "absolute",
-    top: "100%",
-    transform: "translateX(-50%)",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: 2,
-    padding: 0,
-    borderWidth: 0,
-    backgroundColor: "transparent",
-    color: { default: colors.inkFaint, ":hover": colors.ink },
-    cursor: "pointer",
-  },
-  // Offsets by half the native thumb (16px) so a notch sits under the thumb's centre.
-  markAt: (fraction: number) => ({ left: `calc(8px + (100% - 16px) * ${fraction})` }),
-  notch: {
-    width: 2,
-    height: 5,
-    backgroundColor: "currentColor",
-  },
-  notchOn: {
-    backgroundColor: colors.grass,
-  },
-  markLabel: {
-    fontFamily: fonts.mono,
-    fontSize: 9,
-    lineHeight: 1,
-  },
-  stepper: {
-    width: 26,
-    height: 26,
-    flexShrink: 0,
-    padding: 0,
-    borderWidth: 2,
-    borderStyle: "solid",
-    borderColor: colors.line,
-    borderRadius: 3,
-    backgroundColor: { default: colors.panelSunk, ":hover": colors.panelRaised },
-    color: colors.ink,
-    fontSize: 16,
-    fontWeight: 900,
-    lineHeight: 1,
-    cursor: "pointer",
-    transform: { default: null, ":active": "translateY(1px)" },
-  },
-  numberInput: {
-    width: 58,
-    flexShrink: 0,
-    paddingBlock: 4,
-    paddingInline: 6,
-    borderWidth: 2,
-    borderStyle: "solid",
-    borderColor: { default: colors.line, ":focus": colors.gold },
-    borderRadius: 3,
-    outline: "none",
-    backgroundColor: colors.skyDeep,
-    color: colors.gold,
-    fontFamily: fonts.mono,
-    fontSize: 14,
-    fontWeight: 700,
-    textAlign: "right",
-  },
-  toggleRow: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: 0,
-    borderWidth: 0,
-    backgroundColor: "transparent",
-    cursor: "pointer",
-    textAlign: "left",
-  },
-  track: {
-    position: "relative",
-    width: 44,
-    height: 22,
-    borderRadius: 3,
-    backgroundColor: colors.skyDeep,
-    borderWidth: 2,
-    borderStyle: "solid",
-    borderColor: colors.line,
-    transitionProperty: "background-color",
-    transitionDuration: "150ms",
-  },
-  trackOn: {
-    backgroundColor: colors.grassDark,
-    borderColor: colors.grass,
-  },
-  knob: {
-    position: "absolute",
-    top: 2,
-    left: 2,
-    width: 14,
-    height: 14,
-    backgroundColor: colors.inkSoft,
-    boxShadow: "inset -2px -2px 0 rgba(0,0,0,0.25)",
-    transitionProperty: "transform",
-    transitionDuration: "150ms",
-  },
-  knobOn: {
-    transform: "translateX(22px)",
-    backgroundColor: colors.ink,
-  },
-  segments: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: 4,
-    padding: 3,
-    borderRadius: 4,
-    backgroundColor: colors.skyDeep,
-  },
-  segment: {
-    flexGrow: 1,
-    paddingBlock: 6,
-    paddingInline: 10,
-    borderWidth: 0,
-    borderRadius: 3,
-    backgroundColor: { default: "transparent", ":hover": colors.panelRaised },
-    color: colors.inkSoft,
-    fontFamily: fonts.body,
-    fontSize: 13,
-    fontWeight: 800,
-    cursor: "pointer",
-  },
-  segmentOn: {
-    backgroundColor: { default: colors.grass, ":hover": colors.grass },
-    color: colors.skyDeep,
-    boxShadow: `inset 0 -3px 0 ${colors.grassDark}`,
-  },
-});

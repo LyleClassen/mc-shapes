@@ -1,4 +1,3 @@
-import * as stylex from "@stylexjs/stylex";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   eraserCells,
@@ -25,7 +24,10 @@ import type { Grid } from "../../shapes/grid";
 import type { Highlight } from "../../shapes/patterns";
 import type { Point } from "../../shapes/raster";
 import { defaultValues } from "../../shapes/types";
-import { colors, fonts } from "../../theme/tokens.stylex";
+import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
+import { Toggle } from "@/components/ui/toggle";
+import { cn } from "@/lib/utils";
 
 /** dataTransfer type for a shape dragged in from the palette. */
 export const SHAPE_TYPE = "application/x-composite-shape";
@@ -50,6 +52,7 @@ type Drag =
   | { kind: "rect"; from: Point; to: Point; target: string | null; restore: boolean };
 
 const NO_CENTER: CenterMarks = { x: { start: 0, length: 0 }, y: { start: 0, length: 0 }, straight: [] };
+// Matches the stage's p-5.
 const STAGE_PADDING = 20;
 
 const SELECTED = "#52f1e5";
@@ -307,31 +310,19 @@ export function CompositeStage({ api, canvas, skin, highlight, highlightRow, don
   };
 
   return (
-    <div {...stylex.props(styles.wrap)}>
-      <div {...stylex.props(styles.toolbar)}>
-        <button type="button" onClick={() => setZoom(null)} {...stylex.props(styles.chip, zoom === null && styles.chipOn)}>
+    <div className="flex min-w-0 flex-col gap-2.5">
+      <div className="flex flex-wrap items-center gap-2.5">
+        <Toggle variant="chip" pressed={zoom === null} onPressedChange={() => setZoom(null)}>
           Fit
-        </button>
-        <label {...stylex.props(styles.zoomLabel)}>
+        </Toggle>
+        <Label className="min-w-[180px] grow text-[13px] text-secondary-foreground">
           Zoom
-          <input
-            type="range"
-            min={2}
-            max={maxCell}
-            value={cell}
-            onChange={e => setZoom(Number(e.target.value))}
-            {...stylex.props(styles.zoom)}
-          />
-          <span {...stylex.props(styles.mono)}>{cell}px</span>
-        </label>
-        <button
-          type="button"
-          aria-pressed={gridLines}
-          onClick={() => setGridLines(g => !g)}
-          {...stylex.props(styles.chip, gridLines && styles.chipOn)}
-        >
+          <Slider tone="diamond" min={2} max={maxCell} value={cell} onValueChange={v => setZoom(v as number)} />
+          <span className="min-w-[38px] text-right font-mono text-xs text-diamond">{cell}px</span>
+        </Label>
+        <Toggle variant="chip" pressed={gridLines} onPressedChange={setGridLines}>
           Grid lines
-        </button>
+        </Toggle>
       </div>
 
       <div
@@ -342,10 +333,10 @@ export function CompositeStage({ api, canvas, skin, highlight, highlightRow, don
           e.dataTransfer.dropEffect = "copy";
         }}
         onDrop={onDrop}
-        {...stylex.props(styles.stage)}
+        className="relative flex h-[min(68vh,760px)] min-h-80 overflow-auto rounded-md border-[3px] border-border bg-sky-deep p-5 shadow-[inset_0_0_0_2px_var(--shadow),5px_5px_0_var(--shadow)]"
       >
-        <div {...stylex.props(styles.layers)}>
-          <canvas ref={baseRef} {...stylex.props(styles.base)} />
+        <div className="relative m-auto shrink-0 shadow-[0_0_0_3px_var(--shadow),0_12px_40px_rgba(0,0,0,0.45)]">
+          <canvas ref={baseRef} className="block [image-rendering:pixelated]" />
           <canvas
             ref={overRef}
             onPointerDown={onPointerDown}
@@ -356,29 +347,32 @@ export function CompositeStage({ api, canvas, skin, highlight, highlightRow, don
               setHover(null);
               onHover(null);
             }}
-            {...stylex.props(styles.over, tool === "move" ? styles.moveCursor : styles.drawCursor)}
+            className={cn("absolute inset-0 touch-none", tool === "move" ? "cursor-move" : "cursor-crosshair")}
           />
         </div>
         {!composite.layers.length && (
-          <div {...stylex.props(styles.empty)}>
-            <b {...stylex.props(styles.emptyTitle)}>Drag a shape here to start</b>
+          <div className="pointer-events-none absolute top-1/2 left-1/2 flex max-w-80 -translate-1/2 flex-col items-center gap-2 rounded-md border-2 border-dashed border-grass bg-[rgba(12,9,36,0.8)] px-5 py-4 text-center text-[13px] text-secondary-foreground">
+            <b className="font-pixel text-[11px] leading-[1.5] text-grass">Drag a shape here to start</b>
             <span>Pick one from the bar above and drop it onto the canvas. Then draw lines or erase on top.</span>
           </div>
         )}
         {api.notice && (
-          <div role="status" {...stylex.props(styles.notice)}>
+          <div
+            role="status"
+            className="pointer-events-none absolute top-3 left-1/2 -translate-x-1/2 rounded-[4px] bg-destructive px-3.5 py-2 text-[13px] font-extrabold text-sky-deep"
+          >
             {api.notice}
           </div>
         )}
       </div>
 
-      <div {...stylex.props(styles.readout)} aria-live="polite">
+      <div className="flex min-h-[22px] flex-wrap gap-4 text-[13px] text-muted-foreground" aria-live="polite">
         <span>
           Canvas {width} × {height}
         </span>
         {hover && hover.x >= 0 && hover.y >= 0 && hover.x < width && hover.y < height && (
           <span>
-            x <b {...stylex.props(styles.em)}>{hover.x}</b> · y <b {...stylex.props(styles.em)}>{hover.y}</b>
+            x <b className="font-mono text-gold">{hover.x}</b> · y <b className="font-mono text-gold">{hover.y}</b>
           </span>
         )}
         <span>{hint(api)}</span>
@@ -421,93 +415,3 @@ function useElementSize(ref: React.RefObject<HTMLElement | null>) {
   }, [ref]);
   return size;
 }
-
-const styles = stylex.create({
-  wrap: { display: "flex", flexDirection: "column", gap: 10, minWidth: 0 },
-  toolbar: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 },
-  chip: {
-    paddingBlock: 6,
-    paddingInline: 12,
-    borderWidth: 2,
-    borderStyle: "solid",
-    borderColor: colors.line,
-    borderRadius: 3,
-    backgroundColor: { default: colors.panelSunk, ":hover": colors.panelRaised },
-    color: colors.inkSoft,
-    fontFamily: fonts.body,
-    fontSize: 13,
-    fontWeight: 800,
-    cursor: "pointer",
-  },
-  chipOn: { borderColor: colors.diamond, color: colors.diamond },
-  zoomLabel: {
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-    flexGrow: 1,
-    minWidth: 180,
-    color: colors.inkSoft,
-    fontSize: 13,
-    fontWeight: 800,
-  },
-  zoom: { flexGrow: 1, minWidth: 0, accentColor: colors.diamond },
-  mono: { fontFamily: fonts.mono, fontSize: 12, color: colors.diamond, minWidth: 38, textAlign: "right" },
-  stage: {
-    position: "relative",
-    height: "min(68vh, 760px)",
-    minHeight: 320,
-    overflow: "auto",
-    display: "flex",
-    padding: STAGE_PADDING,
-    borderRadius: 6,
-    borderWidth: 3,
-    borderStyle: "solid",
-    borderColor: colors.line,
-    backgroundColor: colors.skyDeep,
-    boxShadow: `inset 0 0 0 2px ${colors.shadow}, 5px 5px 0 ${colors.shadow}`,
-  },
-  layers: { position: "relative", margin: "auto", flexShrink: 0, boxShadow: `0 0 0 3px ${colors.shadow}, 0 12px 40px rgba(0,0,0,0.45)` },
-  base: { display: "block", imageRendering: "pixelated" },
-  over: { position: "absolute", inset: 0, touchAction: "none" },
-  moveCursor: { cursor: "move" },
-  drawCursor: { cursor: "crosshair" },
-  notice: {
-    position: "absolute",
-    top: 12,
-    left: "50%",
-    transform: "translateX(-50%)",
-    paddingBlock: 8,
-    paddingInline: 14,
-    borderRadius: 4,
-    backgroundColor: colors.redstone,
-    color: colors.skyDeep,
-    fontSize: 13,
-    fontWeight: 800,
-    pointerEvents: "none",
-  },
-  empty: {
-    position: "absolute",
-    top: "50%",
-    left: "50%",
-    transform: "translate(-50%, -50%)",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: 8,
-    maxWidth: 320,
-    paddingBlock: 16,
-    paddingInline: 20,
-    borderWidth: 2,
-    borderStyle: "dashed",
-    borderColor: colors.grass,
-    borderRadius: 6,
-    backgroundColor: "rgba(12, 9, 36, 0.8)",
-    color: colors.inkSoft,
-    fontSize: 13,
-    textAlign: "center",
-    pointerEvents: "none",
-  },
-  emptyTitle: { fontFamily: fonts.pixel, fontSize: 11, lineHeight: 1.5, color: colors.grass },
-  readout: { display: "flex", flexWrap: "wrap", gap: 16, minHeight: 22, fontSize: 13, color: colors.inkFaint },
-  em: { fontFamily: fonts.mono, color: colors.gold },
-});

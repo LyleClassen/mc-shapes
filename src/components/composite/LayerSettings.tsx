@@ -1,4 +1,4 @@
-import * as stylex from "@stylexjs/stylex";
+import { CrosshairIcon, MoveHorizontalIcon, MoveVerticalIcon } from "lucide-react";
 import {
   CANVAS_MAX,
   CANVAS_MIN,
@@ -18,7 +18,19 @@ import { fillParams } from "../../shapes/fill";
 import type { Point } from "../../shapes/raster";
 import { defaultValues, resolveValues, type ParamValue } from "../../shapes/types";
 import { ParamControls } from "../ParamControls";
-import { NumberField, styles as ui } from "./controls";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { NumberField } from "./controls";
+
+const STACK = "flex flex-col gap-3";
+const ROW = "flex flex-wrap items-center gap-2";
+const ROW_LABEL = "text-[13px] font-extrabold text-secondary-foreground";
+
+const SHAPE_ITEMS = SHAPES.map(s => ({ value: s.id, label: s.name }));
 
 /** The selected layer's settings: name, visibility, position, centring, its own params, then duplicate and delete. */
 export function LayerSettings({ api, layer }: { api: CompositeApi; layer: Layer }) {
@@ -27,20 +39,18 @@ export function LayerSettings({ api, layer }: { api: CompositeApi; layer: Layer 
   const centre = (h: boolean, v: boolean) => set(l => centreLayer(l, canvas, h, v));
 
   return (
-    <div {...stylex.props(ui.stack)}>
-      <div {...stylex.props(ui.row)}>
-        <input
+    <div className={STACK}>
+      <div className={ROW}>
+        <Input
           aria-label="Layer name"
           value={layer.name}
           onChange={e => set(l => ({ ...l, name: e.target.value }), "name")}
-          {...stylex.props(ui.input, ui.grow)}
+          className="w-auto grow"
         />
-        <button type="button" onClick={() => set(l => ({ ...l, visible: !l.visible }))} {...stylex.props(ui.button)}>
-          {layer.visible ? "Hide" : "Show"}
-        </button>
+        <Button onClick={() => set(l => ({ ...l, visible: !l.visible }))}>{layer.visible ? "Hide" : "Show"}</Button>
       </div>
 
-      <div {...stylex.props(ui.row)}>
+      <div className={ROW}>
         {layer.kind === "image" ? (
           // Images are placed by their centre block, which stays put while resizing.
           <>
@@ -53,39 +63,49 @@ export function LayerSettings({ api, layer }: { api: CompositeApi; layer: Layer 
             <NumberField label="y" value={layer.y} onChange={y => set(l => moveLayer(l, l.x, y), "y")} />
           </>
         )}
-        {isOffCanvas(layer, canvas) && <span {...stylex.props(ui.badge, ui.warn)}>Off canvas</span>}
+        {isOffCanvas(layer, canvas) && <Badge variant="destructive">Off canvas</Badge>}
       </div>
 
-      <div {...stylex.props(ui.row)}>
-        <button type="button" title="Centre on the canvas" onClick={() => centre(true, true)} {...stylex.props(ui.button)}>
-          ✛ Centre
-        </button>
-        <button type="button" title="Centre left to right" onClick={() => centre(true, false)} {...stylex.props(ui.button)}>
-          ⇔ Horizontally
-        </button>
-        <button type="button" title="Centre top to bottom" onClick={() => centre(false, true)} {...stylex.props(ui.button)}>
-          ⇕ Vertically
-        </button>
+      <div className={ROW}>
+        <Tooltip>
+          <TooltipTrigger render={<Button onClick={() => centre(true, true)} />}>
+            <CrosshairIcon data-icon="inline-start" />
+            Centre
+          </TooltipTrigger>
+          <TooltipContent>Centre on the canvas</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger render={<Button onClick={() => centre(true, false)} />}>
+            <MoveHorizontalIcon data-icon="inline-start" />
+            Horizontally
+          </TooltipTrigger>
+          <TooltipContent>Centre left to right</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger render={<Button onClick={() => centre(false, true)} />}>
+            <MoveVerticalIcon data-icon="inline-start" />
+            Vertically
+          </TooltipTrigger>
+          <TooltipContent>Centre top to bottom</TooltipContent>
+        </Tooltip>
       </div>
 
       {layer.kind === "shape" && <ShapeSettings api={api} layer={layer} />}
       {layer.kind === "line" && <LineSettings api={api} layer={layer} />}
       {layer.kind === "image" && <ImageSettings api={api} layer={layer} />}
       {layer.kind === "eraser" && (
-        <p {...stylex.props(ui.muted)}>
+        <FieldDescription>
           {layer.cells.length
             ? `${layer.cells.length} painted ${layer.cells.length === 1 ? "cell" : "cells"}, tinted red while selected. Paint with the Eraser tool to add more, or switch it to Restore to take some back.`
             : "Empty: every cell has been restored. Paint with the Eraser tool, or delete the layer."}
-        </p>
+        </FieldDescription>
       )}
 
-      <div {...stylex.props(ui.row)}>
-        <button type="button" onClick={() => api.duplicate(layer.id)} {...stylex.props(ui.button)}>
-          Duplicate
-        </button>
-        <button type="button" onClick={() => api.deleteLayer(layer.id)} {...stylex.props(ui.button, ui.danger)}>
+      <div className={ROW}>
+        <Button onClick={() => api.duplicate(layer.id)}>Duplicate</Button>
+        <Button variant="destructive" onClick={() => api.deleteLayer(layer.id)}>
           Delete
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -99,26 +119,34 @@ function ShapeSettings({ api, layer }: { api: CompositeApi; layer: Extract<Layer
 
   return (
     <>
-      <label {...stylex.props(ui.label)}>
-        Shape
-        <select
+      <Field>
+        <FieldLabel className={ROW_LABEL}>Shape</FieldLabel>
+        <Select
+          items={SHAPE_ITEMS}
           value={shape.id}
-          onChange={e => {
+          onValueChange={id => {
+            if (!id) return;
             // A new shape starts from its own defaults but keeps the layer's Fill.
-            const next = getShape(e.target.value);
+            const next = getShape(id);
             const fill = resolveValues(fillParams, layer.values);
             set(l => ({ ...l, shapeId: next.id, values: { ...defaultValues(next.params), ...fill } }));
           }}
-          {...stylex.props(ui.input)}
         >
-          {SHAPES.map(s => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      <p {...stylex.props(ui.muted)}>{shape.description}</p>
+          <SelectTrigger aria-label="Shape">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              {SHAPE_ITEMS.map(item => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+      </Field>
+      <FieldDescription>{shape.description}</FieldDescription>
       <ParamControls params={shape.params} values={resolveValues(shape.params, layer.values)} onChange={setValue} />
       <ParamControls params={fillParams} values={resolveValues(fillParams, layer.values)} onChange={setValue} />
     </>
@@ -136,16 +164,16 @@ function LineSettings({ api, layer }: { api: CompositeApi; layer: LineLayer }) {
       {(["a", "b"] as const).map(end => {
         const p = end === "a" ? a : b;
         return (
-          <div key={end} {...stylex.props(ui.row)}>
-            <span {...stylex.props(ui.label)}>{end.toUpperCase()}</span>
+          <div key={end} className={ROW}>
+            <span className={ROW_LABEL}>{end.toUpperCase()}</span>
             <NumberField label="x" value={p.x} onChange={v => set(end, "x", v)} />
             <NumberField label="y" value={p.y} onChange={v => set(end, "y", v)} />
           </div>
         );
       })}
-      <p {...stylex.props(ui.muted)}>
+      <FieldDescription>
         Endpoints are canvas x/y. Drag the yellow handles with the Move tool; Shift snaps to 0°, 45° or 90°.
-      </p>
+      </FieldDescription>
     </>
   );
 }
@@ -157,10 +185,10 @@ function ImageSettings({ api, layer }: { api: CompositeApi; layer: ImageLayer })
   const grid = layerGrid(layer);
   return (
     <>
-      <p {...stylex.props(ui.muted)}>
-        <span {...stylex.props(ui.badge)}>experimental</span> Traced from an imported picture · {grid.width} ×{" "}
+      <FieldDescription>
+        <Badge>experimental</Badge> Traced from an imported picture · {grid.width} ×{" "}
         {grid.height} blocks
-      </p>
+      </FieldDescription>
       <ParamControls params={imageParams} values={values} onChange={setValue} />
       {values.trace === "silhouette" && (
         <ParamControls params={fillParams} values={resolveValues(fillParams, layer.values)} onChange={setValue} />
@@ -173,9 +201,9 @@ function ImageSettings({ api, layer }: { api: CompositeApi; layer: ImageLayer })
 export function CanvasSettings({ api }: { api: CompositeApi }) {
   const { canvas } = api.composite;
   return (
-    <div {...stylex.props(ui.stack)}>
-      <div {...stylex.props(ui.row)}>
-        <span {...stylex.props(ui.label)}>Canvas</span>
+    <div className={STACK}>
+      <div className={ROW}>
+        <span className={ROW_LABEL}>Canvas</span>
         <NumberField
           label="w"
           value={canvas.width}
@@ -183,7 +211,7 @@ export function CanvasSettings({ api }: { api: CompositeApi }) {
           max={CANVAS_MAX}
           onChange={width => api.resize({ ...canvas, width }, "width")}
         />
-        <span {...stylex.props(ui.muted)}>×</span>
+        <span className="text-xs text-muted-foreground">×</span>
         <NumberField
           label="h"
           value={canvas.height}
@@ -192,15 +220,15 @@ export function CanvasSettings({ api }: { api: CompositeApi }) {
           onChange={height => api.resize({ ...canvas, height }, "height")}
         />
       </div>
-      <p {...stylex.props(ui.muted)}>
+      <FieldDescription>
         {CANVAS_MIN}–{CANVAS_MAX} blocks a side. Resizing keeps the top-left fixed; blocks pushed off the edge come
         back if you make it bigger again.
-      </p>
-      <p {...stylex.props(ui.muted)}>
+      </FieldDescription>
+      <FieldDescription>
         {api.composite.layers.length
           ? "Select a layer in the Layers panel, or Ctrl-click it on the canvas, to edit it."
           : "Drag a shape from the bar above onto the canvas to start."}
-      </p>
+      </FieldDescription>
     </div>
   );
 }

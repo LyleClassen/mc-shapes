@@ -1,7 +1,8 @@
-import * as stylex from "@stylexjs/stylex";
+import { CheckIcon } from "lucide-react";
 import { memo } from "react";
 import { rowCount, rowSegments, type Grid } from "../shapes/grid";
-import { colors, fonts } from "../theme/tokens.stylex";
+import { Toggle } from "@/components/ui/toggle";
+import { cn } from "@/lib/utils";
 
 interface Props {
   grid: Grid;
@@ -17,7 +18,10 @@ interface Props {
  */
 export function RowGuide({ grid, highlightRow, doneRows, onHoverRow, onToggleRow }: Props) {
   return (
-    <ol {...stylex.props(styles.list)} onPointerLeave={() => onHoverRow(null)}>
+    <ol
+      className="m-0 flex max-h-[min(68vh,760px)] list-none flex-col gap-[3px] overflow-y-auto p-0 pr-1"
+      onPointerLeave={() => onHoverRow(null)}
+    >
       {Array.from({ length: grid.height }, (_, y) => (
         <Row
           key={y}
@@ -51,114 +55,39 @@ const Row = memo(function Row({
   const segments = rowSegments(grid, y);
   return (
     <li>
-      <button
-        type="button"
-        aria-pressed={done}
+      <Toggle
+        pressed={done}
         onPointerEnter={() => onHoverRow(y)}
         onFocus={() => onHoverRow(y)}
-        onClick={() => onToggleRow(y)}
-        {...stylex.props(styles.row, highlighted && styles.rowHighlighted, done && styles.rowDone)}
+        onPressedChange={() => onToggleRow(y)}
+        data-highlighted={highlighted || undefined}
+        // Row layout on the toggle; a ticked row fades, the highlighted row gets a gold edge.
+        className="grid w-full grid-cols-[18px_30px_1fr_auto] gap-2 rounded-[4px] border-transparent px-2 py-[5px] text-left font-normal whitespace-normal text-foreground data-highlighted:border-gold data-highlighted:bg-accent data-pressed:border-transparent data-pressed:text-foreground data-pressed:opacity-55 data-pressed:data-highlighted:border-gold"
       >
-        <span {...stylex.props(styles.check, done && styles.checkOn)}>{done ? "✓" : ""}</span>
-        <span {...stylex.props(styles.index)}>{y + 1}</span>
-        <span {...stylex.props(styles.segments)}>
+        <span
+          className={cn(
+            "grid size-4 place-items-center rounded-[2px] border-2 border-input text-sky-deep [&_svg]:size-2.5! [&_svg]:stroke-[4]",
+            done && "border-grass bg-grass",
+          )}
+        >
+          {done && <CheckIcon />}
+        </span>
+        <span className="text-right font-mono text-xs text-muted-foreground">{y + 1}</span>
+        <span className="flex min-w-0 flex-wrap gap-[3px]">
           {segments.map((s, i) => (
-            <span key={i} {...stylex.props(styles.seg, s.filled ? styles.segFilled : styles.segGap)}>
+            <span
+              key={i}
+              className={cn(
+                "rounded-[2px] px-[5px] py-px font-mono text-xs leading-[1.5] font-bold",
+                s.filled ? "bg-grass text-sky-deep shadow-[inset_0_-2px_0_var(--grass-dark)]" : "text-muted-foreground",
+              )}
+            >
               {s.filled ? s.length : `·${s.length}`}
             </span>
           ))}
         </span>
-        <span {...stylex.props(styles.count)}>{rowCount(grid, y)}</span>
-      </button>
+        <span className="font-pixel text-[10px] text-gold">{rowCount(grid, y)}</span>
+      </Toggle>
     </li>
   );
-});
-
-const styles = stylex.create({
-  list: {
-    listStyle: "none",
-    margin: 0,
-    padding: 0,
-    display: "flex",
-    flexDirection: "column",
-    gap: 3,
-    maxHeight: "min(68vh, 760px)",
-    overflowY: "auto",
-    paddingRight: 4,
-  },
-  row: {
-    width: "100%",
-    display: "grid",
-    gridTemplateColumns: "18px 30px 1fr auto",
-    alignItems: "center",
-    gap: 8,
-    paddingBlock: 5,
-    paddingInline: 8,
-    borderWidth: 2,
-    borderStyle: "solid",
-    borderColor: "transparent",
-    borderRadius: 4,
-    backgroundColor: { default: colors.panelSunk, ":hover": colors.panelRaised },
-    color: colors.ink,
-    cursor: "pointer",
-    textAlign: "left",
-  },
-  rowHighlighted: {
-    borderColor: colors.gold,
-    backgroundColor: { default: colors.panelRaised, ":hover": colors.panelRaised },
-  },
-  rowDone: {
-    opacity: 0.55,
-  },
-  check: {
-    width: 16,
-    height: 16,
-    display: "grid",
-    placeItems: "center",
-    borderWidth: 2,
-    borderStyle: "solid",
-    borderColor: colors.line,
-    borderRadius: 2,
-    fontSize: 11,
-    fontWeight: 900,
-    color: colors.skyDeep,
-  },
-  checkOn: {
-    backgroundColor: colors.grass,
-    borderColor: colors.grass,
-  },
-  index: {
-    fontFamily: fonts.mono,
-    fontSize: 12,
-    color: colors.inkFaint,
-    textAlign: "right",
-  },
-  segments: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: 3,
-    minWidth: 0,
-  },
-  seg: {
-    paddingBlock: 1,
-    paddingInline: 5,
-    borderRadius: 2,
-    fontFamily: fonts.mono,
-    fontSize: 12,
-    fontWeight: 700,
-    lineHeight: 1.5,
-  },
-  segFilled: {
-    backgroundColor: colors.grass,
-    color: colors.skyDeep,
-    boxShadow: `inset 0 -2px 0 ${colors.grassDark}`,
-  },
-  segGap: {
-    color: colors.inkFaint,
-  },
-  count: {
-    fontFamily: fonts.pixel,
-    fontSize: 10,
-    color: colors.gold,
-  },
 });
