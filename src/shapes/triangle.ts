@@ -1,4 +1,5 @@
 import { rasterConvex, rotateOutline, type Point } from "./raster";
+import { centreParam, centreParity } from "./symmetry";
 import { defineShape, ROTATION_MARKS } from "./types";
 
 /** Rows needed for an equilateral triangle with the given side, in blocks. */
@@ -22,7 +23,8 @@ export const triangle = defineShape({
       ],
       default: "equilateral",
     },
-    { kind: "number", key: "base", label: "Base", min: 1, max: 1024, default: 21, unit: "blocks" },
+    centreParam,
+    { kind: "number", key: "base", label: "Base", min: 1, max: 1024, default: 21, unit: "blocks", parity: centreParity },
     {
       kind: "number",
       key: "height",

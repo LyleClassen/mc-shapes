@@ -1,4 +1,5 @@
 import { gridFrom } from "./grid";
+import { centreParam, centreParity } from "./symmetry";
 import { defineShape } from "./types";
 
 export const ellipse = defineShape({
@@ -6,8 +7,9 @@ export const ellipse = defineShape({
   name: "Ellipse",
   description: "Stretched circles for arenas and ponds.",
   params: [
-    { kind: "number", key: "width", label: "Width", min: 1, max: 1024, default: 25, unit: "blocks" },
-    { kind: "number", key: "height", label: "Height", min: 1, max: 1024, default: 15, unit: "blocks" },
+    centreParam,
+    { kind: "number", key: "width", label: "Width", min: 1, max: 1024, default: 25, unit: "blocks", parity: centreParity },
+    { kind: "number", key: "height", label: "Height", min: 1, max: 1024, default: 15, unit: "blocks", parity: centreParity },
   ],
   build({ width, height }) {
     const rx = width / 2;

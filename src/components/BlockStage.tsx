@@ -5,6 +5,7 @@ import type { Skin } from "../render/skins";
 import type { CenterMarks } from "../shapes/center";
 import type { Highlight } from "../shapes/patterns";
 import { isFilled, type Grid, type Span } from "../shapes/grid";
+import { mirrorText } from "../shapes/symmetry";
 import { visibleView } from "../render/viewport";
 import { useStageZoom, ZoomControls } from "./StageZoom";
 import { Button } from "@/components/ui/button";
@@ -137,13 +138,19 @@ export function BlockStage({ grid, center, guides, highlight, skin, highlightRow
 
 const EM = "font-mono text-gold";
 
-function CenterReadout({ center: { x: cx, y: cy } }: { center: CenterMarks }) {
+function CenterReadout({ center: { x: cx, y: cy, mirror } }: { center: CenterMarks }) {
   const range = (s: Span) =>
     s.length === 1 ? `${s.start + 1}` : `${s.start + 1}–${s.start + s.length}`;
   return (
     <span>
       Centre {cx.length}×{cy.length} · Column <b className={EM}>{range(cx)}</b> · Row{" "}
       <b className={EM}>{range(cy)}</b>
+      {mirrorText(mirror) && (
+        <>
+          {" "}
+          · Mirrored <b className={EM}>{mirrorText(mirror)}</b>
+        </>
+      )}
     </span>
   );
 }

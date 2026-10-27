@@ -1,5 +1,6 @@
 import { centerGuides, centerSpan, type Grid, type Span } from "./grid";
 import type { Point } from "./raster";
+import { mirrorAxes, type Axes } from "./symmetry";
 import type { CenterHint, SelectParam } from "./types";
 
 type Cells = readonly { x: number; y: number }[];
@@ -8,6 +9,8 @@ type Cells = readonly { x: number; y: number }[];
 export interface CenterMarks {
   x: Span;
   y: Span;
+  /** Which ways the layout mirrors onto itself about its centre. */
+  mirror: Axes;
   /** Straight lines along the centre column(s) and row(s), out to the walls. */
   straight: Cells;
   /** The shape's own guide lines, when it defines them. */
@@ -79,7 +82,7 @@ export function lineCells(a: Point, b: Point): { x: number; y: number }[] {
 export function centerMarks(grid: Grid, hint?: CenterHint, offset = { x: 0, y: 0 }): CenterMarks {
   if (!hint) {
     const x = centerSpan(grid.width), y = centerSpan(grid.height);
-    return { x, y, straight: centerGuides(grid, x, y) };
+    return { x, y, mirror: mirrorAxes(grid), straight: centerGuides(grid, x, y) };
   }
 
   const shift = (p: Point) => ({ x: p.x - offset.x, y: p.y - offset.y });
@@ -96,5 +99,11 @@ export function centerMarks(grid: Grid, hint?: CenterHint, offset = { x: 0, y: 0
   }
   const center = shift(hint.center);
   const x = spanAround(center.x), y = spanAround(center.y);
-  return { x, y, straight: centerGuides(grid, x, y), shaped: { label: hint.label, cells: guides } };
+  // A hinted centre can sit off the middle; the mirror lines only mean anything through the middle.
+  const mid = { x: centerSpan(grid.width), y: centerSpan(grid.height) };
+  const axes = mirrorAxes(grid);
+  const mirror = { x: axes.x && sameSpan(x, mid.x), y: axes.y && sameSpan(y, mid.y) };
+  return { x, y, mirror, straight: centerGuides(grid, x, y), shaped: { label: hint.label, cells: guides } };
 }
+
+const sameSpan = (a: Span, b: Span) => a.start === b.start && a.length === b.length;

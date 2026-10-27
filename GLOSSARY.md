@@ -19,6 +19,14 @@ _Avoid_: Image, picture, drawing
 A shape's solid-or-outline option: keep the whole shape, or only its outer walls at a chosen thickness.
 _Avoid_: Using "fill" to mean painting an area
 
+**Centre type**:
+How a symmetric build centres: _1×1_ on a single block (odd sizes only), _2×2_ on a group of four (even sizes only), or _Free_ for any size. Picking one makes the size controls step by 2, so scaling keeps the centre.
+_Avoid_: Centre mode, odd/even mode
+
+**Mirror line**:
+A line a block plan matches itself across, left to right or top to bottom. It runs through the middle of a 1-wide centre, or along the seam of a 2-wide one. The centre readout lists the plan's mirror lines; the dashed gold centre lines are drawn both ways whether or not the plan mirrors.
+_Avoid_: Symmetry axis (in the UI)
+
 ### Composites
 
 **Composite**:
@@ -50,7 +58,7 @@ A layer that removes blocks from the layers below it. It is made of the cells pa
 _Avoid_: Delete, clear
 
 **Image layer** (experimental):
-A layer traced from an imported picture. It keeps the picture's drawn part as a mask, so its size and trace mode can be changed at any time. It is placed by its centre block, which stays put while resizing.
+A layer traced from an imported picture. It keeps the picture's drawn part as a mask, so its size and trace mode can be changed at any time. It is placed by its centre block, which stays put while resizing. A picture that is roughly mirror-symmetric starts with a centre type; with one set, the trace is built from one half and mirrored, so it comes out exactly symmetric at every size.
 _Avoid_: Picture layer, sprite
 
 **Trace mode**:

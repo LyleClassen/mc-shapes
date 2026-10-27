@@ -2,7 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { countBlocks, gridFrom, type Grid } from "../shapes/grid";
 import { EMPTY_COMPOSITE, flatten, layerGrid, newImageLayer } from "./composite";
 import { layerCentre, placeCentre, resizeImageLayer } from "./edit";
-import { decodeMask, encodeMask, imageGrid, inkGrid, MASK_MAX, thin, traceSize } from "./image";
+import { mirrorAxes } from "../shapes/symmetry";
+import { decodeMask, encodeMask, imageGrid, inkGrid, MASK_MAX, maskSymmetry, thin, traceSize } from "./image";
 
 /** Rows of `#` (block) and `.` (air). */
 const show = (grid: Grid) =>
@@ -164,5 +165,67 @@ describe("image layers", () => {
       const resized = resizeImageLayer(layer, { ...layer.values, size });
       expect(layerCentre(resized)).toEqual({ x: 50, y: 70 });
     }
+  });
+});
+
+/**
+ * A lollipop: a ring on a stem, mirrored left to right but not top to bottom.
+ * `skew` nudges the stem sideways, like an imperfect hand drawing.
+ */
+const lollipopMask = (skew = 0) => {
+  const rgba = picture(
+    200,
+    300,
+    (x, y) => ring(100, 100, 90, 6)(x, y) || (y >= 190 && y < 290 && Math.abs(x + 0.5 - 100 - skew) <= 3),
+    BLACK,
+    CLEAR,
+  );
+  return encodeMask(inkGrid(rgba, 200, 300)!, `lollipop${skew}`);
+};
+
+describe("symmetric pictures", () => {
+  test("are detected on each axis they mirror on, allowing a little wobble", () => {
+    expect(maskSymmetry(ringMask())).toEqual({ x: true, y: true });
+    expect(maskSymmetry(lollipopMask())).toEqual({ x: true, y: false });
+    expect(maskSymmetry(lollipopMask(2))).toEqual({ x: true, y: false });
+    const corner = encodeMask(inkGrid(picture(100, 100, (x, y) => x < 10 || y < 10, BLACK, CLEAR), 100, 100)!, "corner");
+    expect(maskSymmetry(corner)).toEqual({ x: false, y: false });
+  });
+
+  test("start with the centre type that matches their size", () => {
+    expect(newImageLayer(EMPTY_COMPOSITE, lollipopMask()).values.centre).toBe("2x2");
+    const odd = { ...EMPTY_COMPOSITE, canvas: { width: 33, height: 64 } };
+    expect(newImageLayer(odd, lollipopMask()).values.centre).toBe("1x1");
+    const corner = encodeMask(inkGrid(picture(100, 100, (x, y) => x < 10 || y < 10, BLACK, CLEAR), 100, 100)!, "corner");
+    expect(newImageLayer(EMPTY_COMPOSITE, corner).values.centre).toBe("free");
+  });
+
+  test("trace exactly mirrored at the centre type's sizes", () => {
+    for (const trace of ["lines", "silhouette"]) {
+      for (let size = 20; size <= 60; size += 7) {
+        for (const [centre, odd] of [["1x1", true], ["2x2", false]] as const) {
+          const grid = imageGrid(lollipopMask(2), { centre, size, trace });
+          expect(grid.width % 2 === 1).toBe(odd);
+          expect(mirrorAxes(grid).x).toBe(true);
+        }
+      }
+    }
+  });
+
+  test("keep the height's parity in step when they mirror top to bottom too", () => {
+    const mask = ringMask();
+    for (let size = 21; size <= 41; size += 4) {
+      expect(traceSize(mask, size, "1x1").height % 2).toBe(1);
+      const grid = imageGrid(mask, { centre: "1x1", size, trace: "lines" });
+      expect(grid.height % 2).toBe(1);
+      expect(mirrorAxes(grid)).toEqual({ x: true, y: true });
+    }
+  });
+
+  test("free traces as before", () => {
+    const mask = ringMask();
+    expect(imageGrid(mask, { centre: "free", size: 40, trace: "lines" })).toBe(imageGrid(mask, { size: 40, trace: "lines" }));
+    const height = Math.round((mask.height * 40) / mask.width);
+    expect(traceSize(mask, 40, "free")).toEqual({ width: 40, height });
   });
 });

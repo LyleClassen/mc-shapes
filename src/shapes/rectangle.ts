@@ -1,4 +1,5 @@
 import { gridFrom } from "./grid";
+import { centreParam, centreParity } from "./symmetry";
 import { defineShape } from "./types";
 
 export const rectangle = defineShape({
@@ -6,8 +7,9 @@ export const rectangle = defineShape({
   name: "Rectangle",
   description: "Floors, walls and plots, with optional rounded corners.",
   params: [
-    { kind: "number", key: "width", label: "Width", min: 1, max: 1024, default: 20, unit: "blocks" },
-    { kind: "number", key: "height", label: "Height", min: 1, max: 1024, default: 12, unit: "blocks" },
+    centreParam,
+    { kind: "number", key: "width", label: "Width", min: 1, max: 1024, default: 20, unit: "blocks", parity: centreParity },
+    { kind: "number", key: "height", label: "Height", min: 1, max: 1024, default: 12, unit: "blocks", parity: centreParity },
     {
       kind: "number",
       key: "radius",

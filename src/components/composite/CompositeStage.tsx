@@ -24,6 +24,7 @@ import { fillParams } from "../../shapes/fill";
 import type { Grid, Span } from "../../shapes/grid";
 import type { Highlight } from "../../shapes/patterns";
 import type { Point } from "../../shapes/raster";
+import { mirrorText, NO_AXES } from "../../shapes/symmetry";
 import { defaultValues } from "../../shapes/types";
 import { useStageZoom, ZoomControls } from "../StageZoom";
 import { Toggle } from "@/components/ui/toggle";
@@ -53,7 +54,7 @@ type Drag =
   | { kind: "brush"; id: string; last: Point; restore: boolean }
   | { kind: "rect"; from: Point; to: Point; target: string | null; restore: boolean };
 
-const NO_CENTER: CenterMarks = { x: { start: 0, length: 0 }, y: { start: 0, length: 0 }, straight: [] };
+const NO_CENTER: CenterMarks = { x: { start: 0, length: 0 }, y: { start: 0, length: 0 }, mirror: NO_AXES, straight: [] };
 // Matches the stage's p-5.
 const STAGE_PADDING = 20;
 
@@ -374,6 +375,12 @@ export function CompositeStage({ api, canvas, center, skin, highlight, highlight
           <span>
             Centre {center.x.length}×{center.y.length} · x <b className="font-mono text-gold">{spanText(center.x)}</b> · y{" "}
             <b className="font-mono text-gold">{spanText(center.y)}</b>
+            {mirrorText(center.mirror) && (
+              <>
+                {" "}
+                · Mirrored <b className="font-mono text-gold">{mirrorText(center.mirror)}</b>
+              </>
+            )}
           </span>
         )}
         {hover && hover.x >= 0 && hover.y >= 0 && hover.x < width && hover.y < height && (

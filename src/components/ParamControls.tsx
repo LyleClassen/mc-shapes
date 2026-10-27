@@ -3,7 +3,7 @@ import { useId } from "react";
 import {
   resolveHint,
   resolveMarks,
-  resolveMax,
+  resolveRange,
   type NumberParam,
   type ParamDef,
   type ParamValue,
@@ -57,11 +57,10 @@ function NumberControl({
 }) {
   const id = useId();
   const value = Number(values[param.key]);
-  const max = resolveMax(param, values);
-  const step = param.step ?? 1;
-  const set = (v: number) => onChange(Math.min(max, Math.max(param.min, v)));
+  const { min, max, step } = resolveRange(param, values);
+  const set = (v: number) => onChange(Math.min(max, Math.max(min, v)));
   const marks = resolveMarks(param, values);
-  const span = max - param.min;
+  const span = max - min;
   // Dragging near a notch lands on it; the steppers and number box stay exact.
   const snap = (v: number) => marks.find(m => Math.abs(m.value - v) <= Math.max(step, span / 72))?.value ?? v;
 
@@ -70,7 +69,7 @@ function NumberControl({
       <div className="flex items-baseline justify-between gap-2">
         <FieldLabel htmlFor={id}>{param.label}</FieldLabel>
         <span className="font-mono text-[11px] text-muted-foreground">
-          {param.min}–{max}
+          {min}–{max}
           {param.unit ? ` ${param.unit}` : ""}
         </span>
       </div>
@@ -80,7 +79,7 @@ function NumberControl({
         </Button>
         <div className="relative flex min-w-0 grow">
           <Slider
-            min={param.min}
+            min={min}
             max={max}
             step={step}
             value={value}
@@ -96,7 +95,7 @@ function NumberControl({
               onClick={() => set(m.value)}
               className="absolute top-full flex -translate-x-1/2 cursor-pointer flex-col items-center gap-0.5 p-0 text-muted-foreground hover:text-foreground"
               // Offsets by half the 16px thumb so a notch sits under the thumb's centre.
-              style={{ left: `calc(8px + (100% - 16px) * ${span ? (m.value - param.min) / span : 0})` }}
+              style={{ left: `calc(8px + (100% - 16px) * ${span ? (m.value - min) / span : 0})` }}
             >
               <span className={cn("h-[5px] w-0.5 bg-current", m.value === value && "bg-grass")} />
               {m.label && <span className="font-mono text-[9px] leading-none">{m.label}</span>}
@@ -106,7 +105,7 @@ function NumberControl({
         <Button size="icon" aria-label={`Increase ${param.label}`} onClick={() => set(value + step)}>
           <PlusIcon />
         </Button>
-        <NumberInput id={id} variant="readout" min={param.min} max={max} step={step} value={value} onChange={set} />
+        <NumberInput id={id} variant="readout" min={min} max={max} step={step} value={value} onChange={set} />
       </div>
       <Hint param={param} values={values} />
     </Field>

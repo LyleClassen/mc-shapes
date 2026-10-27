@@ -23,7 +23,11 @@ export interface NumberParam extends BaseParam {
   unit?: string;
   /** Notches on the slider that it snaps to; a function lets them follow other params. */
   marks?: readonly SliderMark[] | ((values: ParamValues) => readonly SliderMark[]);
+  /** Keeps the value odd or even (stepping by 2), e.g. to hold a 1×1 or 2×2 centre; undefined for any. */
+  parity?: (values: ParamValues) => Parity | undefined;
 }
+
+export type Parity = "odd" | "even";
 
 export interface SliderMark {
   value: number;
@@ -105,6 +109,22 @@ export function resolveHint(param: ParamDef, values: ParamValues): string | unde
   return typeof param.hint === "function" ? param.hint(values) : param.hint;
 }
 
+/**
+ * The range and step the controls offer: with a parity, the ends move inward
+ * to the nearest allowed value and the step doubles. Falls back to the plain
+ * range when no value in it has the parity.
+ */
+export function resolveRange(param: NumberParam, values: ParamValues): { min: number; max: number; step: number } {
+  const max = resolveMax(param, values);
+  const step = param.step ?? 1;
+  const parity = param.parity?.(values);
+  if (!parity) return { min: param.min, max, step };
+  const fits = (v: number) => (Math.abs(v) % 2 === 1) === (parity === "odd");
+  const lo = fits(param.min) ? param.min : param.min + 1;
+  const hi = fits(max) ? max : max - 1;
+  return lo > hi ? { min: param.min, max, step } : { min: lo, max: hi, step: 2 * step };
+}
+
 /** The param's marks that fall inside its current range. */
 export function resolveMarks(param: NumberParam, values: ParamValues): readonly SliderMark[] {
   const marks = typeof param.marks === "function" ? param.marks(values) : (param.marks ?? []);
@@ -122,14 +142,17 @@ export function defaultValues(params: readonly ParamDef[]): ParamValues {
   return Object.fromEntries(params.map(p => [p.key, p.default]));
 }
 
-/** Fills in missing values and clamps numbers into their (possibly dynamic) range. */
+/** Fills in missing values and clamps numbers into their (possibly dynamic) range, keeping any parity. */
 export function resolveValues(params: readonly ParamDef[], input: ParamValues = {}): ParamValues {
   const values: ParamValues = { ...defaultValues(params), ...input };
   for (const p of params) {
     if (p.kind !== "number") continue;
     const v = Number(values[p.key]);
-    const clamped = Math.min(resolveMax(p, values), Math.max(p.min, Number.isFinite(v) ? v : p.default));
-    values[p.key] = clamped;
+    const { min, max, step } = resolveRange(p, values);
+    const clamped = Math.min(max, Math.max(min, Number.isFinite(v) ? v : p.default));
+    // A value of the wrong parity rounds up to the next allowed one, or down at the top of the range.
+    const off = p.parity && step % 2 === 0 ? (clamped - min) % 2 : 0;
+    values[p.key] = off ? (clamped + 1 <= max ? clamped + 1 : clamped - 1) : clamped;
   }
   return values;
 }

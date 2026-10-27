@@ -1,6 +1,7 @@
 import { applyFill, fillParams } from "../shapes/fill";
 import { EMPTY_GRID, gridFrom, trim, type Grid } from "../shapes/grid";
 import { outsideAir } from "../shapes/patterns";
+import { centreParam, centreParity, mirrorGrid, NO_AXES, type Axes } from "../shapes/symmetry";
 import { resolveValues, type ParamDef, type ParamValues } from "../shapes/types";
 import { rasterLine } from "./draw";
 
@@ -21,6 +22,13 @@ export interface ImageMask {
 
 export const imageParams: readonly ParamDef[] = [
   {
+    ...centreParam,
+    hint: v =>
+      v.centre === "free"
+        ? "Any size; the trace follows the picture as drawn."
+        : `${v.centre === "1x1" ? "Odd" : "Even"} sizes only, and the trace is mirrored so a symmetric picture stays exactly symmetric.`,
+  },
+  {
     kind: "number",
     key: "size",
     label: "Size",
@@ -28,6 +36,7 @@ export const imageParams: readonly ParamDef[] = [
     max: 1024,
     default: 64,
     unit: "blocks wide",
+    parity: centreParity,
     hint: "The height follows the picture's shape. Resizing keeps the centre where it is.",
   },
   {
@@ -58,7 +67,14 @@ export const imageParams: readonly ParamDef[] = [
 ];
 
 /** What a new image layer starts with: lines, plus a 1-thick outline ready for Silhouette. */
-export const DEFAULT_IMAGE_VALUES: ParamValues = { size: 64, trace: "lines", closeGaps: 0, fill: "hollow", thickness: 1 };
+export const DEFAULT_IMAGE_VALUES: ParamValues = {
+  centre: "free",
+  size: 64,
+  trace: "lines",
+  closeGaps: 0,
+  fill: "hollow",
+  thickness: 1,
+};
 
 /**
  * The drawn part of an RGBA picture, or null when nothing is drawn. A picture
@@ -123,9 +139,10 @@ export function encodeMask(grid: Grid, id: string = crypto.randomUUID()): ImageM
 const DECODED_CACHE_SIZE = 8;
 const decoded = new Map<string, Grid>();
 const skeletons = new Map<string, Grid>();
+const symmetries = new Map<string, Axes>();
 
 /** Keeps a small per-mask cache, dropping the oldest entry. */
-function remember(cache: Map<string, Grid>, key: string, make: () => Grid): Grid {
+function remember<T>(cache: Map<string, T>, key: string, make: () => T): T {
   const hit = cache.get(key);
   if (hit) return hit;
   const grid = make();
@@ -143,9 +160,49 @@ export function decodeMask(mask: ImageMask): Grid {
   });
 }
 
-/** Block width and height for a trace `size` blocks wide. */
-export function traceSize(mask: ImageMask, size: number): { width: number; height: number } {
-  return { width: size, height: Math.max(1, Math.round((mask.height * size) / mask.width)) };
+/** Share of ink that must find ink at its mirrored spot for a picture to count as symmetric that way. */
+const SYMMETRY_MATCH = 0.9;
+
+/**
+ * Which ways the picture is (roughly) mirror-symmetric. Hand drawings are
+ * never exact, so a pixel matches when its mirror image lands within about 1%
+ * of the picture's size of some ink.
+ */
+export function maskSymmetry(mask: ImageMask): Axes {
+  return remember(symmetries, mask.id, () => {
+    const grid = decodeMask(mask);
+    const { width: w, height: h, cells } = grid;
+    const near = spread(grid, Math.max(1, Math.round(Math.max(w, h) / 100))).cells;
+    let ink = 0, x = 0, y = 0;
+    for (let r = 0; r < h; r++) {
+      for (let c = 0; c < w; c++) {
+        if (!cells[r * w + c]) continue;
+        ink++;
+        x += near[r * w + w - 1 - c]!;
+        y += near[(h - 1 - r) * w + c]!;
+      }
+    }
+    return ink ? { x: x >= ink * SYMMETRY_MATCH, y: y >= ink * SYMMETRY_MATCH } : NO_AXES;
+  });
+}
+
+/** The centre type a new layer of this picture starts with: one matching `size` when the picture is symmetric. */
+export function detectCentre(mask: ImageMask, size: number): string {
+  const axes = maskSymmetry(mask);
+  if (!axes.x && !axes.y) return "free";
+  return size % 2 ? "1x1" : "2x2";
+}
+
+/**
+ * Block width and height for a trace `size` blocks wide. With a centre type,
+ * the height keeps the same parity as the width when the picture mirrors top
+ * to bottom, so both axes centre alike.
+ */
+export function traceSize(mask: ImageMask, size: number, centre = "free"): { width: number; height: number } {
+  const exact = (mask.height * size) / mask.width;
+  let height = Math.round(exact);
+  if (centre !== "free" && maskSymmetry(mask).y && (height - size) % 2) height = height < exact ? height + 1 : height - 1;
+  return { width: size, height: Math.max(1, height) };
 }
 
 const TRACE_CACHE_SIZE = 32;
@@ -157,20 +214,22 @@ const traceCache = new Map<string, Grid>();
  * Callers must not mutate the grid.
  */
 export function imageGrid(mask: ImageMask, values: ParamValues): Grid {
-  const { size, trace, closeGaps } = resolveValues(imageParams, values);
+  const { centre, size, trace, closeGaps } = resolveValues(imageParams, values);
   const fill = resolveValues(fillParams, values);
-  const key = JSON.stringify([mask.id, size, trace, trace === "silhouette" ? [closeGaps, fill] : null]);
+  const key = JSON.stringify([mask.id, centre, size, trace, trace === "silhouette" ? [closeGaps, fill] : null]);
   const cached = traceCache.get(key);
   if (cached) {
     traceCache.delete(key);
     traceCache.set(key, cached);
     return cached;
   }
-  const blocks = traceSize(mask, Number(size));
+  const blocks = traceSize(mask, Number(size), String(centre));
+  // With a centre type, a symmetric picture is traced from one half and mirrored, so rounding can't skew it.
+  const axes = centre === "free" ? NO_AXES : maskSymmetry(mask);
   const grid =
     trace === "silhouette"
-      ? trim(applyFill(trim(traceSilhouette(decodeMask(mask), blocks, Number(closeGaps))), fill))
-      : trim(traceLines(remember(skeletons, mask.id, () => thin(decodeMask(mask))), blocks));
+      ? trim(applyFill(trim(mirrorGrid(traceSilhouette(decodeMask(mask), blocks, Number(closeGaps)), axes)), fill))
+      : trim(mirrorGrid(traceLines(remember(skeletons, mask.id, () => thin(decodeMask(mask))), blocks), axes));
   traceCache.set(key, grid);
   if (traceCache.size > TRACE_CACHE_SIZE) traceCache.delete(traceCache.keys().next().value!);
   return grid;

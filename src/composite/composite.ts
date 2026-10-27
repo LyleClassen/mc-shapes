@@ -4,7 +4,7 @@ import { EMPTY_GRID, trim, trimOffset, type Grid } from "../shapes/grid";
 import type { Point } from "../shapes/raster";
 import { resolveValues, type ParamValues } from "../shapes/types";
 import { rasterLine } from "./draw";
-import { DEFAULT_IMAGE_VALUES, imageGrid, type ImageMask } from "./image";
+import { DEFAULT_IMAGE_VALUES, detectCentre, imageGrid, type ImageMask } from "./image";
 
 export const CANVAS_MIN = 8;
 export const CANVAS_MAX = 1024;
@@ -201,9 +201,13 @@ export function newShapeLayer(composite: Composite, shapeId: string, values: Par
   return { kind: "shape", id: newId(), name, visible: true, ...pos, shapeId: shape.id, values };
 }
 
-/** A new image layer centred on the canvas, named after its file. Starts at most 64 blocks wide. */
+/**
+ * A new image layer centred on the canvas, named after its file. Starts at
+ * most 64 blocks wide, with a centre type when the picture is symmetric.
+ */
 export function newImageLayer(composite: Composite, mask: ImageMask, fileName = ""): ImageLayer {
-  const values = { ...DEFAULT_IMAGE_VALUES, size: Math.min(Number(DEFAULT_IMAGE_VALUES.size), composite.canvas.width) };
+  const size = Math.min(Number(DEFAULT_IMAGE_VALUES.size), composite.canvas.width);
+  const values = { ...DEFAULT_IMAGE_VALUES, size, centre: detectCentre(mask, size) };
   const pos = centredPosition(imageGrid(mask, values), composite.canvas);
   const base = fileName.replace(/\.[^.]*$/, "").trim() || KIND_NAMES.image;
   const name = nextLayerName(composite.layers, base);

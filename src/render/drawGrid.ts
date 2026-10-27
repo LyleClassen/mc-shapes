@@ -13,7 +13,10 @@ export interface DrawOptions {
   highlightRow: number | null;
   doneRows: ReadonlySet<number>;
   center: CenterMarks;
-  /** Outline the centre block — 1×1, 2×1, 1×2 or 2×2 depending on whether each side is odd or even. */
+  /**
+   * Outline the centre block — 1×1, 2×1, 1×2 or 2×2 depending on whether each
+   * side is odd or even — marking a 1×1 or 2×2 centre, plus dashed centre lines across and down.
+   */
   showCenter: boolean;
   /** Guide blocks leading from the shape's walls to its centre; empty for none. */
   guides: readonly { x: number; y: number }[];
@@ -34,6 +37,8 @@ const DONE = "rgba(12, 9, 36, 0.62)";
 const GUIDE = "rgba(255, 210, 63, 0.26)";
 const GUIDE_EDGE = "rgba(255, 210, 63, 0.7)";
 const CENTER_FILL = "rgba(255, 210, 63, 0.42)";
+const AXIS = "rgba(255, 210, 63, 0.7)";
+const EDGE = "rgba(12, 9, 36, 0.9)";
 const MUTED = { face: "#3b3560", light: "#4a4475", dark: "#2b2648", text: "#ffffff" };
 
 /**
@@ -128,16 +133,58 @@ export function drawGrid(canvas: HTMLCanvasElement, grid: Grid, o: DrawOptions) 
 
   if (o.showCenter) {
     const x = cx.start * c, y = cy.start * c, cw = cx.length * c, ch = cy.length * c;
+    // The middle of the centre: inside a lone block, or on the seam between two.
+    const mx = x + cw / 2, my = y + ch / 2;
     const stroke = Math.max(2, Math.round(c / 8));
+
+    // Centre lines, across and down, go first so the marker sits on top of them.
+    ctx.beginPath();
+    ctx.moveTo(mx, 0);
+    ctx.lineTo(mx, h * c);
+    ctx.moveTo(0, my);
+    ctx.lineTo(w * c, my);
+    const dash = Math.max(4, c / 2);
+    ctx.setLineDash([dash, dash]);
+    outline(ctx, Math.max(1, Math.round(c / 12)), AXIS);
+    ctx.setLineDash([]);
+
     ctx.fillStyle = CENTER_FILL;
     ctx.fillRect(x, y, cw, ch);
-    ctx.strokeStyle = "rgba(12, 9, 36, 0.9)";
-    ctx.lineWidth = stroke + 2;
-    ctx.strokeRect(x + stroke / 2, y + stroke / 2, cw - stroke, ch - stroke);
-    ctx.strokeStyle = CENTER;
-    ctx.lineWidth = stroke;
-    ctx.strokeRect(x + stroke / 2, y + stroke / 2, cw - stroke, ch - stroke);
+    ctx.beginPath();
+    ctx.rect(x + stroke / 2, y + stroke / 2, cw - stroke, ch - stroke);
+    outline(ctx, stroke, CENTER);
+
+    // Tells the centre type at a glance: a diamond in a 1×1 centre, a cross through a 2×2 one's shared corner.
+    if (cx.length === 1 && cy.length === 1 && c >= 8) {
+      const r = c * 0.24;
+      ctx.beginPath();
+      ctx.moveTo(mx, my - r);
+      ctx.lineTo(mx + r, my);
+      ctx.lineTo(mx, my + r);
+      ctx.lineTo(mx - r, my);
+      ctx.closePath();
+      ctx.fillStyle = CENTER;
+      ctx.fill();
+      outline(ctx, Math.max(1, stroke / 2), CENTER);
+    } else if (cx.length === 2 && cy.length === 2 && c >= 6) {
+      ctx.beginPath();
+      ctx.moveTo(mx, y + stroke);
+      ctx.lineTo(mx, y + ch - stroke);
+      ctx.moveTo(x + stroke, my);
+      ctx.lineTo(x + cw - stroke, my);
+      outline(ctx, Math.max(1, stroke / 2), CENTER);
+    }
   }
+}
+
+/** Strokes the current path in `color` over a dark edge, so it reads on any block colour. */
+function outline(ctx: CanvasRenderingContext2D, width: number, color: string) {
+  ctx.strokeStyle = EDGE;
+  ctx.lineWidth = width + 2;
+  ctx.stroke();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width;
+  ctx.stroke();
 }
 
 type Shade = Pick<Skin, "face" | "light" | "dark">;

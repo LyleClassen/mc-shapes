@@ -5,6 +5,7 @@ import { useComposite } from "../../composite/useComposite";
 import { getSkin, SKINS } from "../../render/skins";
 import type { CenterMarks } from "../../shapes/center";
 import { centerSpan, countBlocks, type Grid } from "../../shapes/grid";
+import { mirrorAxes } from "../../shapes/symmetry";
 import { highlight, highlightParam, type HighlightMode } from "../../shapes/patterns";
 import type { Point } from "../../shapes/raster";
 import { Panel } from "../Panel";
@@ -56,7 +57,12 @@ export function CompositeMode({ active, view }: { active: boolean; view: SharedV
   const center = useMemo((): CenterMarks | null => {
     if (!grid.width) return null;
     const x = centerSpan(grid.width), y = centerSpan(grid.height);
-    return { x: { ...x, start: x.start + origin.x }, y: { ...y, start: y.start + origin.y }, straight: [] };
+    return {
+      x: { ...x, start: x.start + origin.x },
+      y: { ...y, start: y.start + origin.y },
+      mirror: mirrorAxes(grid),
+      straight: [],
+    };
   }, [grid, origin]);
 
   const toggleRow = useCallback(
