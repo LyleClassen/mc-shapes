@@ -41,8 +41,11 @@ export interface ToggleParam extends BaseParam {
 
 export interface SelectParam extends BaseParam {
   kind: "select";
-  options: readonly { value: string; label: string }[];
+  /** `icon` is an image URL shown beside the label in a dropdown. */
+  options: readonly { value: string; label: string; icon?: string }[];
   default: string;
+  /** Show as a dropdown rather than a row of buttons, for longer option lists. */
+  dropdown?: boolean;
 }
 
 export type ParamDef = NumberParam | ToggleParam | SelectParam;

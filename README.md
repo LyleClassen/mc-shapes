@@ -22,6 +22,10 @@ and other improvements are welcome; see [Contributing](#contributing).
   to preview the build.
 - **Composite mode:** stack shapes, lines, eraser strokes and traced images as
   layers and flatten them into one plan.
+- **Litematica export:** download the plan as a `.litematic` (Minecraft
+  1.21+) in dirt, cobblestone, stone, moss, netherrack, deepslate or end
+  stone, lying flat or standing up as a wall, optionally with the centre
+  marked in gold blocks to help line it up.
 
 ## Local development
 
@@ -135,3 +139,8 @@ For bugs or ideas, [open an issue](https://github.com/LyleClassen/mc-shapes/issu
 ## License
 
 [MIT](LICENSE) © Lyle Classen
+
+The block textures in `src/assets/blocks/` come from Minecraft and belong to
+Mojang Studios. They are not covered by the MIT licence. Shape Crafter is not
+an official Minecraft product and is not approved by or associated with Mojang
+or Microsoft.

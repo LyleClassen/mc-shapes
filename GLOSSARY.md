@@ -27,6 +27,14 @@ _Avoid_: Centre mode, odd/even mode
 A line a block plan matches itself across, left to right or top to bottom. It runs through the middle of a 1-wide centre, or along the seam of a 2-wide one. The centre readout lists the plan's mirror lines; the dashed gold centre lines are drawn both ways whether or not the plan mirrors.
 _Avoid_: Symmetry axis (in the UI)
 
+**Export**:
+A block plan saved as a Litematica schematic (`.litematic`) in one chosen block, ready to place as a hologram in game. It can include the centre block(s) as gold blocks, placed even where the plan has none, to line the build up on.
+_Avoid_: Download, save (for the file itself)
+
+**Orientation**:
+Which way an export faces: _Flat_ lies on the ground with the plan's top row to the north; _Vertical_ stands up as a one-block-thick wall with the top row highest.
+_Avoid_: Rotation, direction
+
 ### Composites
 
 **Composite**:

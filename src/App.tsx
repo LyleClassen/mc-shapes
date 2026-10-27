@@ -2,6 +2,7 @@ import { CheckIcon, CopyIcon, ExternalLinkIcon } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { BlockStage, type Cell } from "./components/BlockStage";
 import { CompositeMode } from "./components/composite/CompositeMode";
+import { ExportPanel } from "./components/ExportPanel";
 import { Panel } from "./components/Panel";
 import { ParamControls } from "./components/ParamControls";
 import { PatternLegend, recolour } from "./components/PatternLegend";
@@ -9,6 +10,7 @@ import { RowGuide } from "./components/RowGuide";
 import { ShapePicker } from "./components/ShapePicker";
 import { SkinPicker } from "./components/SkinPicker";
 import { describeStacks, StatsBar } from "./components/StatsBar";
+import { exportParams } from "./export/litematic";
 import { getSkin, SKINS } from "./render/skins";
 import { applyFill, fillParams } from "./shapes/fill";
 import { centerMarks, effectiveGuideMode, guideCells, guideParam, type GuideMode } from "./shapes/center";
@@ -41,6 +43,7 @@ export function App() {
   );
   const [highlightMode, setHighlightMode] = useSessionState<HighlightMode>("highlight", "off", isHighlightMode);
   const [patternColors, setPatternColors] = useSessionState<Record<string, string>>("patternColors", {}, isRecord);
+  const [exportInput, setExportInput] = useSessionState<ParamValues>("export", () => defaultValues(exportParams), isRecord);
   const [hover, setHover] = useState<Cell | null>(null);
   const [listRow, setListRow] = useState<number | null>(null);
   const [done, setDone] = useState<{ plan: string; rows: ReadonlySet<number> }>({ plan: "", rows: new Set() });
@@ -48,6 +51,8 @@ export function App() {
   const shape = getShape(shapeId);
   const values = resolveValues(shape.params, valuesById[shapeId]);
   const fill = resolveValues(fillParams, fillInput);
+  const exportValues = resolveValues(exportParams, exportInput);
+  const setExportValue = (key: string, value: ParamValue) => setExportInput(prev => ({ ...prev, [key]: value }));
   const plan = JSON.stringify([shapeId, values, fill]);
 
   const { solid, grid, center } = useMemo(() => {
@@ -111,6 +116,7 @@ export function App() {
           <CompositeMode
             active={mode === "composite"}
             view={{ skinId, setSkinId, highlightMode, setHighlightMode, patternColors, setPatternColors }}
+            exportSettings={{ values: exportValues, onChange: setExportValue }}
           />
         </div>
 
@@ -167,25 +173,35 @@ export function App() {
               />
             </section>
 
-            <Panel
-              title="Row guide"
-              accent="diamond"
-              className="max-narrow:col-span-full"
-              action={<CopyButton text={() => planText(shape.name, values, fill, grid)} />}
-            >
-              <p className="m-0 text-xs text-muted-foreground">
-                <span className="font-mono font-bold">·4</span> skip 4 ·{" "}
-                <span className="rounded-[2px] bg-grass px-1 font-mono font-bold text-sky-deep">3</span> place 3 · click a row to tick it off
-                {doneRows.size > 0 && ` · ${doneRows.size}/${grid.height} done`}
-              </p>
-              <RowGuide
-                grid={grid}
-                highlightRow={highlightRow}
-                doneRows={doneRows}
-                onHoverRow={setListRow}
-                onToggleRow={toggleRow}
-              />
-            </Panel>
+            <aside className="flex min-w-0 flex-col gap-5 max-narrow:col-span-full">
+              <Panel
+                title="Row guide"
+                accent="diamond"
+                action={<CopyButton text={() => planText(shape.name, values, fill, grid)} />}
+              >
+                <p className="m-0 text-xs text-muted-foreground">
+                  <span className="font-mono font-bold">·4</span> skip 4 ·{" "}
+                  <span className="rounded-[2px] bg-grass px-1 font-mono font-bold text-sky-deep">3</span> place 3 · click a row to tick it off
+                  {doneRows.size > 0 && ` · ${doneRows.size}/${grid.height} done`}
+                </p>
+                <RowGuide
+                  grid={grid}
+                  highlightRow={highlightRow}
+                  doneRows={doneRows}
+                  onHoverRow={setListRow}
+                  onToggleRow={toggleRow}
+                />
+              </Panel>
+              <Panel title="Export" accent="redstone">
+                <ExportPanel
+                  grid={grid}
+                  name={shape.name}
+                  center={center}
+                  values={exportValues}
+                  onChange={setExportValue}
+                />
+              </Panel>
+            </aside>
           </main>
         )}
 

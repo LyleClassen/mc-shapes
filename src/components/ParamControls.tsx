@@ -14,6 +14,7 @@ import {
 import { NumberInput } from "./NumberInput";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -142,21 +143,48 @@ function SelectControl({
   return (
     <Field>
       <FieldLabel id={id}>{param.label}</FieldLabel>
-      <ToggleGroup
-        aria-labelledby={id}
-        variant="segment"
-        spacing={1}
-        className="w-full flex-wrap rounded-[4px] bg-sky-deep p-[3px]"
-        value={[value]}
-        onValueChange={v => v[0] && onChange(v[0])}
-      >
-        {param.options.map(o => (
-          <ToggleGroupItem key={o.value} value={o.value}>
-            {o.label}
-          </ToggleGroupItem>
-        ))}
-      </ToggleGroup>
+      {param.dropdown ? (
+        <Select items={param.options} value={value} onValueChange={v => v && onChange(v)}>
+          <SelectTrigger aria-labelledby={id}>
+            <SelectValue>{(v: string) => <OptionLabel option={param.options.find(o => o.value === v)} />}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              {param.options.map(o => (
+                <SelectItem key={o.value} value={o.value}>
+                  <OptionLabel option={o} />
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+      ) : (
+        <ToggleGroup
+          aria-labelledby={id}
+          variant="segment"
+          spacing={1}
+          className="w-full flex-wrap rounded-[4px] bg-sky-deep p-[3px]"
+          value={[value]}
+          onValueChange={v => v[0] && onChange(v[0])}
+        >
+          {param.options.map(o => (
+            <ToggleGroupItem key={o.value} value={o.value}>
+              {o.label}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+      )}
       <Hint param={param} values={values} />
     </Field>
+  );
+}
+
+function OptionLabel({ option }: { option?: SelectParam["options"][number] }) {
+  if (!option) return null;
+  return (
+    <span className="flex items-center gap-2">
+      {option.icon && <img src={option.icon} alt="" className="size-4 [image-rendering:pixelated]" />}
+      {option.label}
+    </span>
   );
 }

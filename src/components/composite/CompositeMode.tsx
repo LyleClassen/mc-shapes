@@ -8,6 +8,7 @@ import { centerSpan, countBlocks, type Grid } from "../../shapes/grid";
 import { mirrorAxes } from "../../shapes/symmetry";
 import { highlight, highlightParam, type HighlightMode } from "../../shapes/patterns";
 import type { Point } from "../../shapes/raster";
+import { ExportPanel, type ExportSettings } from "../ExportPanel";
 import { Panel } from "../Panel";
 import { ParamControls } from "../ParamControls";
 import { PatternLegend, recolour } from "../PatternLegend";
@@ -35,10 +36,18 @@ export interface SharedView {
 /**
  * Composite mode: tools and the shape palette on top, the selected layer's
  * settings on the left, the stage with its stats and row guide in the middle,
- * and the Canvas and Layers panels on the right. Kept mounted while Shapes mode is showing,
+ * and the Canvas, Layers and Export panels on the right. Kept mounted while Shapes mode is showing,
  * so the undo history survives the trip; `active` says which mode is showing.
  */
-export function CompositeMode({ active, view }: { active: boolean; view: SharedView }) {
+export function CompositeMode({
+  active,
+  view,
+  exportSettings,
+}: {
+  active: boolean;
+  view: SharedView;
+  exportSettings: ExportSettings;
+}) {
   const api = useComposite(active);
   const flat = useMemo(() => flatten(api.composite), [api.composite]);
   const traced = useMemo(() => highlight(flat.canvas, view.highlightMode), [flat, view.highlightMode]);
@@ -159,6 +168,14 @@ export function CompositeMode({ active, view }: { active: boolean; view: SharedV
           </Panel>
           <Panel title="Layers" accent="diamond">
             <LayersPanel api={api} />
+          </Panel>
+          <Panel title="Export" accent="redstone">
+            <ExportPanel
+              grid={grid}
+              name="Composite"
+              center={grid.width ? { x: centerSpan(grid.width), y: centerSpan(grid.height) } : null}
+              {...exportSettings}
+            />
           </Panel>
         </aside>
       </div>
