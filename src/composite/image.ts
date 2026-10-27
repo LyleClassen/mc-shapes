@@ -3,6 +3,7 @@ import { EMPTY_GRID, gridFrom, trim, type Grid } from "../shapes/grid";
 import { outsideAir } from "../shapes/patterns";
 import { centreParam, centreParity, mirrorGrid, NO_AXES, type Axes } from "../shapes/symmetry";
 import { resolveValues, type ParamDef, type ParamValues } from "../shapes/types";
+import type { Point } from "../shapes/raster";
 import { rasterLine } from "./draw";
 
 /** Longest side of a stored mask. Big enough for 256-block traces, small enough for sessionStorage. */
@@ -64,6 +65,15 @@ export const imageParams: readonly ParamDef[] = [
     hint: "Bridges openings up to twice this wide, so a drawing that isn't fully closed still fills.",
     visible: v => v.trace === "silhouette",
   },
+  {
+    kind: "number",
+    key: "detail",
+    label: "Detail",
+    min: 0,
+    max: 10,
+    default: 5,
+    hint: "Lower straightens lines more; higher keeps smaller corners and notches.",
+  },
 ];
 
 /** What a new image layer starts with: lines, plus a 1-thick outline ready for Silhouette. */
@@ -72,6 +82,7 @@ export const DEFAULT_IMAGE_VALUES: ParamValues = {
   size: 64,
   trace: "lines",
   closeGaps: 0,
+  detail: 5,
   fill: "hollow",
   thickness: 1,
 };
@@ -138,7 +149,8 @@ export function encodeMask(grid: Grid, id: string = crypto.randomUUID()): ImageM
 
 const DECODED_CACHE_SIZE = 8;
 const decoded = new Map<string, Grid>();
-const skeletons = new Map<string, Grid>();
+const skeletonPaths = new Map<string, Point[][]>();
+const contours = new Map<string, Point[][]>();
 const symmetries = new Map<string, Axes>();
 
 /** Keeps a small per-mask cache, dropping the oldest entry. */
@@ -214,9 +226,9 @@ const traceCache = new Map<string, Grid>();
  * Callers must not mutate the grid.
  */
 export function imageGrid(mask: ImageMask, values: ParamValues): Grid {
-  const { centre, size, trace, closeGaps } = resolveValues(imageParams, values);
+  const { centre, size, trace, closeGaps, detail } = resolveValues(imageParams, values);
   const fill = resolveValues(fillParams, values);
-  const key = JSON.stringify([mask.id, centre, size, trace, trace === "silhouette" ? [closeGaps, fill] : null]);
+  const key = JSON.stringify([mask.id, centre, size, trace, detail, trace === "silhouette" ? [closeGaps, fill] : null]);
   const cached = traceCache.get(key);
   if (cached) {
     traceCache.delete(key);
@@ -226,31 +238,33 @@ export function imageGrid(mask: ImageMask, values: ParamValues): Grid {
   const blocks = traceSize(mask, Number(size), String(centre));
   // With a centre type, a symmetric picture is traced from one half and mirrored, so rounding can't skew it.
   const axes = centre === "free" ? NO_AXES : maskSymmetry(mask);
+  // Corners shallower than this are straightened away; never under a pixel, so pixel noise always goes.
+  const tolerance = Math.max(1, ((10 - Number(detail)) / 10) * (mask.width / blocks.width));
   const grid =
     trace === "silhouette"
-      ? trim(applyFill(trim(mirrorGrid(traceSilhouette(decodeMask(mask), blocks, Number(closeGaps)), axes)), fill))
-      : trim(mirrorGrid(traceLines(remember(skeletons, mask.id, () => thin(decodeMask(mask))), blocks), axes));
+      ? trim(applyFill(trim(mirrorGrid(traceSilhouette(mask, blocks, tolerance, Number(closeGaps)), axes)), fill))
+      : trim(mirrorGrid(traceLines(mask, blocks, tolerance), axes));
   traceCache.set(key, grid);
   if (traceCache.size > TRACE_CACHE_SIZE) traceCache.delete(traceCache.keys().next().value!);
   return grid;
 }
 
 /**
- * Everything the outside can't reach is solid; a block is solid when any of
- * its pixels is, so thin lines aren't missed. With `closeGaps`, openings up
- * to twice that many blocks wide are bridged before filling (a closing: grow
- * by `closeGaps`, fill from outside, shrink back).
+ * Everything the outside can't reach is solid. Its outline is traced as
+ * polygons, straightened to `tolerance` pixels and scaled onto the blocks; a
+ * block is solid when its centre is inside, or an edge runs through it so
+ * parts thinner than a block aren't missed. With `closeGaps`, openings up to
+ * twice that many blocks wide are bridged before filling (a closing: grow by
+ * `closeGaps`, fill from outside, shrink back).
  */
-function traceSilhouette(mask: Grid, blocks: { width: number; height: number }, closeGaps: number): Grid {
-  const outside = outsideAir(mask);
+function traceSilhouette(mask: ImageMask, blocks: { width: number; height: number }, tolerance: number, closeGaps: number): Grid {
   const sx = blocks.width / mask.width, sy = blocks.height / mask.height;
-  const cells = new Uint8Array(blocks.width * blocks.height);
-  for (let y = 0; y < mask.height; y++) {
-    for (let x = 0; x < mask.width; x++) {
-      if (outside[y * mask.width + x]) continue;
-      cells[Math.min(blocks.height - 1, Math.floor(y * sy)) * blocks.width + Math.min(blocks.width - 1, Math.floor(x * sx))] = 1;
-    }
-  }
+  const polygons = remember(contours, mask.id, () => solidContours(decodeMask(mask))).map(loop =>
+    simplify([...loop, loop[0]!], tolerance)
+      .slice(0, -1)
+      .map(p => ({ x: p.x * sx, y: p.y * sy })),
+  );
+  const cells = fillPolygons(polygons, blocks);
   const solid: Grid = { ...blocks, cells };
   if (closeGaps < 1) return solid;
 
@@ -286,33 +300,282 @@ function spread(grid: Grid, r: number): Grid {
 }
 
 /**
- * Scales a one-pixel skeleton onto the blocks, joining each pair of
- * neighbouring pixels with a block line so nothing breaks apart when blocks
- * are smaller than pixels, then thins again where lines landed side by side.
+ * The boundaries of the solid pixels as closed loops of pixel corners, with
+ * the solid side always on the right (y down), and a vertex only where the
+ * boundary turns. Holes would come out as loops too, but a silhouette has
+ * none.
  */
-function traceLines(skeleton: Grid, blocks: { width: number; height: number }): Grid {
-  const { width, height, cells } = skeleton;
-  const sx = blocks.width / width, sy = blocks.height / height;
-  const out = new Uint8Array(blocks.width * blocks.height);
-  const at = (x: number, y: number) => ({
-    x: Math.min(blocks.width - 1, Math.floor((x + 0.5) * sx)),
-    y: Math.min(blocks.height - 1, Math.floor((y + 0.5) * sy)),
-  });
-  // Half the 8 directions, so each pair is joined once.
-  const forward = [[1, 0], [-1, 1], [0, 1], [1, 1]] as const;
+function solidContours(mask: Grid): Point[][] {
+  const { width, height } = mask;
+  const outside = outsideAir(mask);
+  const solid = (x: number, y: number) => x >= 0 && y >= 0 && x < width && y < height && !outside[y * width + x];
+  // Each corner has at most two boundary edges leaving it (two where solid pixels touch diagonally).
+  const W = width + 1;
+  const next = new Map<number, number[]>();
+  const edge = (ax: number, ay: number, bx: number, by: number) => {
+    const from = ay * W + ax, list = next.get(from);
+    if (list) list.push(by * W + bx);
+    else next.set(from, [by * W + bx]);
+  };
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
-      if (!cells[y * width + x]) continue;
-      const a = at(x, y);
-      out[a.y * blocks.width + a.x] = 1;
-      for (const [dx, dy] of forward) {
-        const nx = x + dx, ny = y + dy;
-        if (nx < 0 || nx >= width || ny >= height || !cells[ny * width + nx]) continue;
-        for (const p of rasterLine(a, at(nx, ny))) out[p.y * blocks.width + p.x] = 1;
+      if (!solid(x, y)) continue;
+      if (!solid(x, y - 1)) edge(x, y, x + 1, y);
+      if (!solid(x + 1, y)) edge(x + 1, y, x + 1, y + 1);
+      if (!solid(x, y + 1)) edge(x + 1, y + 1, x, y + 1);
+      if (!solid(x - 1, y)) edge(x, y + 1, x, y);
+    }
+  }
+  const loops: Point[][] = [];
+  for (const [start, list] of next) {
+    while (list.length) {
+      const corners = [start];
+      for (let at = list.pop()!; at !== start; ) {
+        corners.push(at);
+        at = next.get(at)!.pop()!;
+      }
+      // Keep only the corners where the direction changes.
+      const loop: Point[] = [];
+      for (let i = 0; i < corners.length; i++) {
+        const [a, b, c] = [corners.at(i - 1)!, corners[i]!, corners[(i + 1) % corners.length]!];
+        if (b - a !== c - b) loop.push({ x: b % W, y: Math.floor(b / W) });
+      }
+      loops.push(loop);
+    }
+  }
+  return loops;
+}
+
+/**
+ * The blocks covered by polygons in block coordinates, solid on the right of
+ * each edge: those whose centre is inside (even–odd), plus those an edge runs
+ * through just inside it, stepping along the edge's longer axis so a slanted
+ * edge steps as evenly as the inside does.
+ */
+function fillPolygons(polygons: Point[][], blocks: { width: number; height: number }): Uint8Array {
+  const { width, height } = blocks;
+  const cells = new Uint8Array(width * height);
+  const set = (x: number, y: number) => {
+    cells[Math.min(height - 1, Math.max(0, y)) * width + Math.min(width - 1, Math.max(0, x))] = 1;
+  };
+  for (let y = 0; y < height; y++) {
+    const cy = y + 0.5;
+    const crossings: number[] = [];
+    for (const poly of polygons) {
+      for (let i = 0; i < poly.length; i++) {
+        const a = poly[i]!, b = poly[(i + 1) % poly.length]!;
+        if (a.y <= cy !== b.y <= cy) crossings.push(a.x + ((cy - a.y) * (b.x - a.x)) / (b.y - a.y));
+      }
+    }
+    crossings.sort((p, q) => p - q);
+    for (let i = 0; i + 1 < crossings.length; i += 2) {
+      for (let x = Math.ceil(crossings[i]! - 0.5); x < Math.ceil(crossings[i + 1]! - 0.5); x++) set(x, y);
+    }
+  }
+  // Nudged a hair to the solid side, so an edge exactly on a block border marks the block inside it.
+  const NUDGE = 1e-3;
+  for (const poly of polygons) {
+    for (let i = 0; i < poly.length; i++) {
+      const a = poly[i]!, b = poly[(i + 1) % poly.length]!;
+      const len = Math.hypot(b.x - a.x, b.y - a.y);
+      if (!len) continue;
+      const nx = (-(b.y - a.y) / len) * NUDGE, ny = ((b.x - a.x) / len) * NUDGE;
+      const [p, q] = [{ x: a.x + nx, y: a.y + ny }, { x: b.x + nx, y: b.y + ny }];
+      const alongX = Math.abs(q.x - p.x) >= Math.abs(q.y - p.y);
+      const [lo, hi] = alongX ? [Math.min(p.x, q.x), Math.max(p.x, q.x)] : [Math.min(p.y, q.y), Math.max(p.y, q.y)];
+      for (let s = Math.floor(lo); s <= Math.floor(hi - 1e-9); s++) {
+        const t = Math.min(hi, Math.max(lo, s + 0.5));
+        if (alongX) set(s, Math.floor(p.y + ((t - p.x) * (q.y - p.y)) / (q.x - p.x || 1)));
+        else set(Math.floor(p.x + ((t - p.y) * (q.x - p.x)) / (q.y - p.y || 1)), s);
       }
     }
   }
+  return cells;
+}
+
+/**
+ * The drawn lines as straight segments: the skeleton's paths straightened to
+ * `tolerance` pixels, scaled onto the blocks and joined with block lines, then
+ * thinned again where lines landed side by side.
+ */
+function traceLines(mask: ImageMask, blocks: { width: number; height: number }, tolerance: number): Grid {
+  const sx = blocks.width / mask.width, sy = blocks.height / mask.height;
+  const out = new Uint8Array(blocks.width * blocks.height);
+  const at = (p: Point) => ({
+    x: Math.min(blocks.width - 1, Math.max(0, Math.floor((p.x + 0.5) * sx))),
+    y: Math.min(blocks.height - 1, Math.max(0, Math.floor((p.y + 0.5) * sy))),
+  });
+  for (const path of remember(skeletonPaths, mask.id, () => tracePaths(mask))) {
+    const points = simplify(path, tolerance).map(at);
+    out[points[0]!.y * blocks.width + points[0]!.x] = 1;
+    for (let i = 1; i < points.length; i++) {
+      for (const p of rasterLine(points[i - 1]!, points[i]!)) out[p.y * blocks.width + p.x] = 1;
+    }
+  }
   return thin({ width: blocks.width, height: blocks.height, cells: out });
+}
+
+const NEIGHBOURS = [[0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1]] as const;
+
+/**
+ * The picture's skeleton as pixel paths: one per stretch of line between
+ * ends and junctions, plus one per closed loop. Touching junction pixels act
+ * as a single junction at their middle, so lines meet at one point, and the
+ * short barbs thinning leaves at sharp corners are dropped.
+ */
+function tracePaths(mask: ImageMask): Point[][] {
+  const ink = decodeMask(mask);
+  const { width, height, cells } = thin(ink);
+  const on = (x: number, y: number) => x >= 0 && y >= 0 && x < width && y < height && cells[y * width + x] === 1;
+  const around = (i: number) => {
+    const x = i % width, y = Math.floor(i / width);
+    return NEIGHBOURS.filter(([dx, dy]) => on(x + dx, y + dy)).map(([dx, dy]) => (y + dy) * width + x + dx);
+  };
+  const point = (i: number): Point => ({ x: i % width, y: Math.floor(i / width) });
+
+  // Ends and junctions, grouped where they touch.
+  const node = new Int32Array(width * height).fill(-1);
+  const nodes: { at: Point; branches: number }[] = [];
+  const paths: Point[][] = [];
+  let skeletonSize = 0;
+  for (let i = 0; i < cells.length; i++) {
+    if (!cells[i]) continue;
+    skeletonSize++;
+    const degree = around(i).length;
+    if (degree === 0) paths.push([point(i)]);
+    if (degree === 2 || node[i]! >= 0) continue;
+    const group = [i];
+    node[i] = nodes.length;
+    for (let k = 0; k < group.length; k++) {
+      for (const j of around(group[k]!)) {
+        if (node[j]! < 0 && around(j).length !== 2) (node[j] = nodes.length), group.push(j);
+      }
+    }
+    const at = group.map(point).reduce((s, p) => ({ x: s.x + p.x / group.length, y: s.y + p.y / group.length }), { x: 0, y: 0 });
+    nodes.push({ at, branches: 0 });
+  }
+
+  // Walk out of each node along each line until the next node.
+  const seen = new Uint8Array(width * height);
+  const edges: { path: Point[]; from: number; to: number }[] = [];
+  for (let i = 0; i < cells.length; i++) {
+    if (!cells[i] || node[i]! < 0) continue;
+    for (const first of around(i)) {
+      if (node[first]! >= 0 || seen[first]) continue;
+      const path = [nodes[node[i]!]!.at];
+      let prev = i, at = first;
+      while (node[at]! < 0 && !seen[at]) {
+        seen[at] = 1;
+        path.push(point(at));
+        const step = around(at).find(j => j !== prev && (node[j]! >= 0 || !seen[j]));
+        if (step === undefined) break;
+        prev = at;
+        at = step;
+      }
+      const to = node[at]!;
+      if (to >= 0) path.push(nodes[to]!.at);
+      edges.push({ path, from: node[i]!, to });
+      nodes[node[i]!]!.branches++;
+      if (to >= 0) nodes[to]!.branches++;
+    }
+  }
+
+  // Barbs: short stretches from a loose end, or looping straight back to the same junction.
+  const stroke = countInk(ink) / Math.max(1, skeletonSize);
+  const loose = (n: number) => n < 0 || nodes[n]!.branches === 1;
+  // A short stroke on its own (loose at both ends) is a real mark, not a barb.
+  const barb = (e: { path: Point[]; from: number; to: number }) =>
+    e.path.length < 2 * stroke && (e.from === e.to || loose(e.from) !== loose(e.to));
+  const kept = edges.filter(e => !barb(e));
+
+  // A junction left with just two lines once its barbs are gone is no junction: join them, so they straighten as one.
+  const touching = new Map<number, typeof kept>();
+  for (const e of kept) {
+    for (const n of [e.from, e.to]) if (n >= 0) touching.set(n, [...(touching.get(n) ?? []), e]);
+  }
+  for (const [n, list] of touching) {
+    if (list.length !== 2 || list[0] === list[1]) continue;
+    let [a, b] = list as [(typeof kept)[number], (typeof kept)[number]];
+    if (a.to !== n) a = { path: a.path.toReversed(), from: a.to, to: a.from };
+    if (b.from !== n) b = { path: b.path.toReversed(), from: b.to, to: b.from };
+    const joined = { path: [...a.path, ...b.path.slice(1)], from: a.from, to: b.to };
+    kept.splice(kept.indexOf(list[0]!), 1);
+    kept.splice(kept.indexOf(list[1]!), 1, joined);
+    for (const end of [joined.from, joined.to]) {
+      const at = touching.get(end);
+      if (at) touching.set(end, at.map(e => (e === list[0] || e === list[1] ? joined : e)));
+    }
+    touching.delete(n);
+  }
+  for (const e of kept) paths.push(e.path);
+
+  // What's left are closed loops with no ends or junctions.
+  for (let i = 0; i < cells.length; i++) {
+    if (!cells[i] || seen[i] || node[i]! >= 0) continue;
+    const path = [point(i)];
+    seen[i] = 1;
+    for (let at = i, prev = -1; ; ) {
+      const step = around(at).find(j => j !== prev && !seen[j]);
+      if (step === undefined) break;
+      seen[step] = 1;
+      path.push(point(step));
+      prev = at;
+      at = step;
+    }
+    path.push(point(i));
+    paths.push(path);
+  }
+  return paths;
+}
+
+const countInk = (grid: Grid) => grid.cells.reduce((s, c) => s + c, 0);
+
+/**
+ * Ramer–Douglas–Peucker: the fewest points that keep the path within
+ * `tolerance` of where it was. A closed path (last point = first) is first
+ * restarted from the point farthest from its start, a real corner, so the
+ * seam can't keep a corner that isn't one.
+ */
+function simplify(path: readonly Point[], tolerance: number): Point[] {
+  if (path.length < 3) return [...path];
+  const first = path[0]!, last = path.at(-1)!;
+  const ring = first.x === last.x && first.y === last.y;
+  if (ring) {
+    const loop = path.slice(0, -1);
+    const far = loop.reduce((best, p, i) => (dist2(p, first) > dist2(loop[best]!, first) ? i : best), 0);
+    const turned = [...loop.slice(far), ...loop.slice(0, far), loop[far]!];
+    return keep(turned, tolerance);
+  }
+  return keep(path, tolerance);
+}
+
+/** RDP on an open path, iteratively so long paths can't overflow the stack. */
+function keep(path: readonly Point[], tolerance: number): Point[] {
+  const kept = new Uint8Array(path.length);
+  kept[0] = kept[path.length - 1] = 1;
+  const stack: [number, number][] = [[0, path.length - 1]];
+  while (stack.length) {
+    const [a, b] = stack.pop()!;
+    let worst = -1, far = tolerance;
+    for (let i = a + 1; i < b; i++) {
+      const d = offLine(path[i]!, path[a]!, path[b]!);
+      if (d > far) (far = d), (worst = i);
+    }
+    if (worst < 0) continue;
+    kept[worst] = 1;
+    stack.push([a, worst], [worst, b]);
+  }
+  return path.filter((_, i) => kept[i]);
+}
+
+const dist2 = (a: Point, b: Point) => (a.x - b.x) ** 2 + (a.y - b.y) ** 2;
+
+/** How far `p` is from the segment `a`–`b`. */
+function offLine(p: Point, a: Point, b: Point): number {
+  const len2 = dist2(a, b);
+  if (!len2) return Math.sqrt(dist2(p, a));
+  const t = Math.max(0, Math.min(1, ((p.x - a.x) * (b.x - a.x) + (p.y - a.y) * (b.y - a.y)) / len2));
+  return Math.sqrt(dist2(p, { x: a.x + t * (b.x - a.x), y: a.y + t * (b.y - a.y) }));
 }
 
 /**

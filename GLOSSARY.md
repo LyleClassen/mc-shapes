@@ -62,7 +62,7 @@ A layer traced from an imported picture. It keeps the picture's drawn part as a 
 _Avoid_: Picture layer, sprite
 
 **Trace mode**:
-How an image layer turns the picture into blocks: _Lines_ follows every drawn line one block wide; _Silhouette_ fills the outer shape (optionally closing gaps in it) and then applies Fill.
+How an image layer turns the picture into blocks: _Lines_ follows every drawn line one block wide; _Silhouette_ fills the outer shape (optionally closing gaps in it) and then applies Fill. Either way the picture is first straightened into segments, so straight lines come out as straight block lines; _Detail_ sets how small a corner or notch survives.
 _Avoid_: Filter, effect
 
 **Flatten**:

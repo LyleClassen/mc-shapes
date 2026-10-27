@@ -134,6 +134,81 @@ describe("imageGrid", () => {
   });
 });
 
+/** The filled cells of each row, or of each column with `byColumn`, as [first, last] spans. */
+const spans = (grid: Grid, byColumn = false) => {
+  const [outer, inner] = byColumn ? [grid.width, grid.height] : [grid.height, grid.width];
+  return Array.from({ length: outer }, (_, o) => {
+    const filled = Array.from({ length: inner }, (_, i) => i).filter(i => grid.cells[byColumn ? i * grid.width + o : o * grid.width + i]);
+    return filled.length ? [filled[0]!, filled.at(-1)!] : null;
+  });
+};
+
+/** True when the steps of a digital line are as even as they can be: run lengths differ by at most 1. */
+const evenSteps = (positions: number[]) => {
+  const runs: number[] = [];
+  let run = 1;
+  for (let i = 1; i < positions.length; i++) {
+    if (positions[i] === positions[i - 1]) run++;
+    else (runs.push(run), (run = 1));
+  }
+  // The end runs can be cut short.
+  const inner = runs.slice(1);
+  return !inner.length || Math.max(...inner) - Math.min(...inner) <= 1;
+};
+
+describe("straight-edged traces", () => {
+  test("a wobbly straight stroke traces as one straight row", () => {
+    // 6 px thick with ±1 px hand wobble along a 300 px bar.
+    const wobble = (x: number) => [0, 1, 0, -1, 1, 0, -1][Math.floor(x / 13) % 7]!;
+    const rgba = picture(320, 40, (x, y) => x >= 10 && x < 310 && Math.abs(y - 20 - wobble(x)) < 3, BLACK, CLEAR);
+    const mask = encodeMask(inkGrid(rgba, 320, 40)!, "wobbly-bar");
+    for (const size of [20, 40, 64]) expect(imageGrid(mask, { size, trace: "lines" }).height).toBe(1);
+  });
+
+  test("a thick diagonal stroke steps evenly", () => {
+    const rgba = picture(300, 120, (x, y) => Math.abs(y - 10 - (x - 10) * 0.35) < 3 && x >= 10 && x < 290, BLACK, CLEAR);
+    const mask = encodeMask(inkGrid(rgba, 300, 120)!, "slant");
+    for (const size of [30, 50, 80]) {
+      const grid = imageGrid(mask, { size, trace: "lines" });
+      expect(isThinLine(grid)).toBe(true);
+      const rowsOf = spans(grid, true).map(s => s?.[0] ?? -1);
+      expect(rowsOf.every(r => r >= 0)).toBe(true);
+      expect(evenSteps(rowsOf)).toBe(true);
+    }
+  });
+
+  test("a square outline keeps four straight sides", () => {
+    const square = (x: number, y: number) => x >= 20 && x < 220 && y >= 20 && y < 220 && !(x >= 26 && x < 214 && y >= 26 && y < 214);
+    const mask = encodeMask(inkGrid(picture(240, 240, square, BLACK, CLEAR), 240, 240)!, "square");
+    const grid = imageGrid(mask, { size: 30, trace: "lines" });
+    const s = show(grid);
+    // Inner rows touch only the left and right columns.
+    for (const row of s.slice(1, -1)) expect(row.slice(1, -1)).toBe(".".repeat(grid.width - 2));
+    // The top and bottom sides are straight, give or take the diagonal-cut corners.
+    expect(s[0]!.slice(1, -1)).toBe("#".repeat(grid.width - 2));
+    expect(s.at(-1)!.slice(1, -1)).toBe("#".repeat(grid.width - 2));
+  });
+
+  test("detail keeps or straightens away a small notch", () => {
+    // A long bar with a 10 px bump up in the middle.
+    const bump = (x: number, y: number) => x >= 10 && x < 410 && ((y >= 40 && y < 46) || (x >= 200 && x < 220 && y >= 30 && y < 46));
+    const mask = encodeMask(inkGrid(picture(420, 60, bump, BLACK, CLEAR), 420, 60)!, "notch");
+    expect(imageGrid(mask, { size: 80, trace: "lines", detail: 10 }).height).toBeGreaterThan(1);
+    expect(imageGrid(mask, { size: 80, trace: "lines", detail: 0 }).height).toBe(1);
+  });
+
+  test("a silhouette's slanted edge steps evenly", () => {
+    // A solid triangle with a long shallow top edge.
+    const triangle = (x: number, y: number) => x >= 10 && x < 290 && y < 110 && y >= 110 - (x - 10) * 0.37;
+    const mask = encodeMask(inkGrid(picture(300, 120, triangle, BLACK, CLEAR), 300, 120)!, "triangle");
+    for (const size of [30, 50, 80]) {
+      const grid = imageGrid(mask, { size, trace: "silhouette", fill: "solid" });
+      const tops = spans(grid, true).map(s => s?.[0] ?? -1);
+      expect(evenSteps(tops.slice(0, -1))).toBe(true);
+    }
+  });
+});
+
 test("close gaps fills a silhouette whose outline has an opening", () => {
   const open = (x: number, y: number) => ring(100, 100, 90, 6)(x, y) && !(x > 90 && x < 110 && y < 50);
   const mask = encodeMask(inkGrid(picture(200, 200, open, BLACK, CLEAR), 200, 200)!, "open-ring");
