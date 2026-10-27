@@ -8,7 +8,7 @@ export const truncatedTriangle = defineShape({
   description: "An equilateral triangle with its corners sliced off.",
   tip: "All corners with cut = side ÷ 3 gives a regular hexagon. Top only makes a trapezoid whose flat top is the cut length.",
   params: [
-    { kind: "number", key: "side", label: "Side length", min: 3, max: 255, default: 30, unit: "blocks" },
+    { kind: "number", key: "side", label: "Side length", min: 3, max: 1024, default: 30, unit: "blocks" },
     {
       kind: "select",
       key: "corners",

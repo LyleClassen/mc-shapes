@@ -5,7 +5,7 @@ import { resolveValues, type ParamDef, type ParamValues } from "../shapes/types"
 import { rasterLine } from "./draw";
 
 /** Longest side of a stored mask. Big enough for 256-block traces, small enough for sessionStorage. */
-export const MASK_MAX = 512;
+export const MASK_MAX = 1024;
 
 /**
  * An imported picture's ink, cropped to its drawn part: 1 bit per pixel,
@@ -25,7 +25,7 @@ export const imageParams: readonly ParamDef[] = [
     key: "size",
     label: "Size",
     min: 8,
-    max: 256,
+    max: 1024,
     default: 64,
     unit: "blocks wide",
     hint: "The height follows the picture's shape. Resizing keeps the centre where it is.",

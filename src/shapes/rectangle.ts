@@ -6,8 +6,8 @@ export const rectangle = defineShape({
   name: "Rectangle",
   description: "Floors, walls and plots, with optional rounded corners.",
   params: [
-    { kind: "number", key: "width", label: "Width", min: 1, max: 255, default: 20, unit: "blocks" },
-    { kind: "number", key: "height", label: "Height", min: 1, max: 255, default: 12, unit: "blocks" },
+    { kind: "number", key: "width", label: "Width", min: 1, max: 1024, default: 20, unit: "blocks" },
+    { kind: "number", key: "height", label: "Height", min: 1, max: 1024, default: 12, unit: "blocks" },
     {
       kind: "number",
       key: "radius",

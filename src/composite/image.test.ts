@@ -74,11 +74,11 @@ describe("inkGrid", () => {
     const w = 1500, h = 300;
     const rgba = picture(w, h, (x, y) => x === 0 || x === w - 1 || y === 0 || y === h - 1 || y === 150, BLACK, CLEAR);
     const grid = inkGrid(rgba, w, h)!;
-    // Shrunk by whole steps of 3, the smallest that fits.
+    // Shrunk by whole steps of 2, the smallest that fits.
     expect(grid.width).toBeLessThanOrEqual(MASK_MAX);
-    expect([grid.width, grid.height]).toEqual([500, 100]);
+    expect([grid.width, grid.height]).toEqual([750, 150]);
     // The middle line is still unbroken.
-    const row = Math.floor(150 / 3);
+    const row = Math.floor(150 / 2);
     expect(Array.from({ length: grid.width }, (_, x) => grid.cells[row * grid.width + x]).every(Boolean)).toBe(true);
   });
 });

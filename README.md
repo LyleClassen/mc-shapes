@@ -22,7 +22,7 @@ export const circle = defineShape({
   name: "Circle",
   description: "Towers, fountains, dome layers.",
   params: [
-    { kind: "number", key: "diameter", label: "Diameter", min: 1, max: 255, default: 15 },
+    { kind: "number", key: "diameter", label: "Diameter", min: 1, max: 1024, default: 15 },
   ],
   build({ diameter }) {
     const r = diameter / 2;

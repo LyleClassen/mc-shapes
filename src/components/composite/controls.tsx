@@ -1,21 +1,17 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { layerGrid, type Layer } from "../../composite/composite";
-import { Input } from "@/components/ui/input";
+import { NumberInput } from "../NumberInput";
 import { Label } from "@/components/ui/label";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
-/**
- * A whole-number field. While typing, only values inside min–max are sent,
- * so a canvas size of 1 on the way to 128 isn't clamped to 8; leaving the
- * field sends the clamped value and shows what was kept.
- */
+/** A labelled whole-number field; see NumberInput for how typing is handled. */
 export function NumberField({
   label,
   value,
-  min = -Infinity,
-  max = Infinity,
+  min,
+  max,
   onChange,
 }: {
   label: string;
@@ -24,29 +20,10 @@ export function NumberField({
   max?: number;
   onChange: (v: number) => void;
 }) {
-  const [draft, setDraft] = useState<string | null>(null);
-  const clamp = (v: number) => Math.min(max, Math.max(min, Math.round(v)));
   return (
     <Label className="gap-1.5 font-mono text-xs text-muted-foreground">
       <span>{label}</span>
-      <Input
-        type="number"
-        step={1}
-        min={Number.isFinite(min) ? min : undefined}
-        max={Number.isFinite(max) ? max : undefined}
-        value={draft ?? value}
-        onChange={e => {
-          setDraft(e.target.value);
-          const v = e.target.valueAsNumber;
-          if (Number.isFinite(v) && v === clamp(v)) onChange(v);
-        }}
-        onBlur={e => {
-          const v = e.target.valueAsNumber;
-          if (Number.isFinite(v) && clamp(v) !== value) onChange(clamp(v));
-          setDraft(null);
-        }}
-        className="w-[68px] font-mono"
-      />
+      <NumberInput value={value} min={min} max={max} onChange={onChange} className="w-[68px] font-mono" />
     </Label>
   );
 }

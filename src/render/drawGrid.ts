@@ -2,6 +2,7 @@ import type { CenterMarks } from "../shapes/center";
 import type { Grid } from "../shapes/grid";
 import type { Highlight } from "../shapes/patterns";
 import type { Skin } from "./skins";
+import { fitCanvas, type View } from "./viewport";
 
 export interface DrawOptions {
   cell: number;
@@ -18,6 +19,8 @@ export interface DrawOptions {
   guides: readonly { x: number; y: number }[];
   /** Outline colours from `highlight`; null for none. */
   highlight: Highlight | null;
+  /** The on-screen part of the drawing, in CSS pixels; only this is painted. */
+  view: View;
 }
 
 const PAD = "#150f40";
@@ -33,74 +36,56 @@ const GUIDE_EDGE = "rgba(255, 210, 63, 0.7)";
 const CENTER_FILL = "rgba(255, 210, 63, 0.42)";
 const MUTED = { face: "#3b3560", light: "#4a4475", dark: "#2b2648", text: "#ffffff" };
 
-/** Largest canvas edge we'll allocate, in device pixels (browsers cap around 16k). */
-export const MAX_CANVAS_PX = 8192;
-
-/** Paints the grid as bevelled blocks, sized to `cell` CSS pixels per block. */
+/**
+ * Paints the grid as bevelled blocks, sized to `cell` CSS pixels per block.
+ * The canvas covers only `view`, so the whole drawing can be far bigger than
+ * any bitmap a browser will allocate.
+ */
 export function drawGrid(canvas: HTMLCanvasElement, grid: Grid, o: DrawOptions) {
-  const dpr = window.devicePixelRatio || 1;
-  const { width: w, height: h, cells } = grid;
+  const { width: w, height: h } = grid;
   const c = o.cell;
   const p = o.padding;
-  const totalW = (w + 2 * p) * c;
-  const totalH = (h + 2 * p) * c;
-  canvas.width = Math.max(1, Math.round(totalW * dpr));
-  canvas.height = Math.max(1, Math.round(totalH * dpr));
-  canvas.style.width = `${totalW}px`;
-  canvas.style.height = `${totalH}px`;
-
-  const ctx = canvas.getContext("2d");
+  const ctx = fitCanvas(canvas, o.view);
   if (!ctx) return;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
   ctx.fillStyle = PAD;
-  ctx.fillRect(0, 0, totalW, totalH);
+  ctx.fillRect(o.view.x, o.view.y, o.view.width, o.view.height);
 
   // Everything below is drawn in shape coordinates: (0, 0) is the shape's top-left block.
   ctx.translate(p * c, p * c);
-
-  ctx.fillStyle = EMPTY_A;
-  ctx.fillRect(0, 0, w * c, h * c);
-  ctx.fillStyle = EMPTY_B;
-  for (let y = 0; y < h; y++) {
-    for (let x = (y % 2); x < w; x += 2) {
-      if (!cells[y * w + x]) ctx.fillRect(x * c, y * c, c, c);
-    }
-  }
+  // The blocks in view: x0 ≤ x < x1, y0 ≤ y < y1.
+  const x0 = Math.max(0, Math.floor(o.view.x / c) - p), x1 = Math.min(w, Math.ceil((o.view.x + o.view.width) / c) - p);
+  const y0 = Math.max(0, Math.floor(o.view.y / c) - p), y1 = Math.min(h, Math.ceil((o.view.y + o.view.height) / c) - p);
 
   // With patterns on, the skin is ignored: outline blocks take their pattern colour
   // and the rest of the shape fades back.
   const hl = o.highlight;
   const shades = hl?.legend.map(({ color }) => skinOf(color));
-  const bevel = c >= 8 ? Math.max(1, Math.round(c / 7)) : 0;
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const i = y * w + x;
-      if (!cells[i]) continue;
-      const key = hl ? hl.keys[i]! : -1;
-      const s = !hl ? o.skin : key < 0 ? MUTED : shades![key]!;
-      const px = x * c, py = y * c;
-      ctx.fillStyle = s.face;
-      ctx.fillRect(px, py, c, c);
-      if (!bevel) continue;
-      ctx.fillStyle = s.light;
-      ctx.fillRect(px, py, c, bevel);
-      ctx.fillRect(px, py, bevel, c);
-      ctx.fillStyle = s.dark;
-      ctx.fillRect(px, py + c - bevel, c, bevel);
-      ctx.fillRect(px + c - bevel, py, bevel, c);
-    }
+  const faceOf = (i: number) => {
+    const key = hl ? hl.keys[i]! : -1;
+    return !hl ? o.skin : key < 0 ? MUTED : shades![key]!;
+  };
+
+  if (c < 2) {
+    // Too small for fillRect per block (neighbours would bleed into seams), so
+    // paint one pixel per block and let the browser scale it down.
+    drawImage(ctx, grid, i => faceOf(i).face, c);
+  } else {
+    drawBlocks(ctx, grid, faceOf, c, x0, x1, y0, y1);
   }
 
   if (hl && c >= 18) {
     ctx.font = `800 ${Math.round(c * 0.45)}px ui-monospace, Menlo, monospace`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    for (let i = 0; i < hl.steps.length; i++) {
-      const key = hl.keys[i]!;
-      if (key < 0) continue;
-      ctx.fillStyle = shades![key]!.text;
-      ctx.fillText(String(hl.steps[i]), (i % w + 0.5) * c, (Math.floor(i / w) + 0.5) * c);
+    for (let y = y0; y < y1; y++) {
+      for (let x = x0; x < x1; x++) {
+        const i = y * w + x;
+        const key = hl.keys[i]!;
+        if (key < 0) continue;
+        ctx.fillStyle = shades![key]!.text;
+        ctx.fillText(String(hl.steps[i]), (x + 0.5) * c, (y + 0.5) * c);
+      }
     }
   }
 
@@ -112,8 +97,10 @@ export function drawGrid(canvas: HTMLCanvasElement, grid: Grid, o: DrawOptions) 
 
   // Grid lines cover the padding too; every 5th line is counted from the shape's edge.
   if (o.gridLines && c >= 5) {
-    for (let x = -p; x <= w + p; x++) line(ctx, x * c, -p * c, x * c, (h + p) * c, x % 5 === 0 ? LINE_MAJOR : LINE);
-    for (let y = -p; y <= h + p; y++) line(ctx, -p * c, y * c, (w + p) * c, y * c, y % 5 === 0 ? LINE_MAJOR : LINE);
+    const lx0 = x0 === 0 ? -p : x0, lx1 = x1 === w ? w + p : x1;
+    const ly0 = y0 === 0 ? -p : y0, ly1 = y1 === h ? h + p : y1;
+    for (let x = lx0; x <= lx1; x++) line(ctx, x * c, ly0 * c, x * c, ly1 * c, x % 5 === 0 ? LINE_MAJOR : LINE);
+    for (let y = ly0; y <= ly1; y++) line(ctx, lx0 * c, y * c, lx1 * c, y * c, y % 5 === 0 ? LINE_MAJOR : LINE);
   }
 
   const { x: cx, y: cy } = o.center;
@@ -151,6 +138,72 @@ export function drawGrid(canvas: HTMLCanvasElement, grid: Grid, o: DrawOptions) 
     ctx.lineWidth = stroke;
     ctx.strokeRect(x + stroke / 2, y + stroke / 2, cw - stroke, ch - stroke);
   }
+}
+
+type Shade = Pick<Skin, "face" | "light" | "dark">;
+
+/** The checkerboard and bevelled blocks in x0–x1 × y0–y1, one fillRect each. */
+function drawBlocks(
+  ctx: CanvasRenderingContext2D,
+  { width: w, height: h, cells }: Grid,
+  shadeOf: (i: number) => Shade,
+  c: number,
+  x0: number,
+  x1: number,
+  y0: number,
+  y1: number,
+) {
+  ctx.fillStyle = EMPTY_A;
+  ctx.fillRect(0, 0, w * c, h * c);
+  ctx.fillStyle = EMPTY_B;
+  for (let y = y0; y < y1; y++) {
+    for (let x = x0 + ((x0 + y) % 2); x < x1; x += 2) {
+      if (!cells[y * w + x]) ctx.fillRect(x * c, y * c, c, c);
+    }
+  }
+
+  const bevel = c >= 8 ? Math.max(1, Math.round(c / 7)) : 0;
+  for (let y = y0; y < y1; y++) {
+    for (let x = x0; x < x1; x++) {
+      const i = y * w + x;
+      if (!cells[i]) continue;
+      const s = shadeOf(i);
+      const px = x * c, py = y * c;
+      ctx.fillStyle = s.face;
+      ctx.fillRect(px, py, c, c);
+      if (!bevel) continue;
+      ctx.fillStyle = s.light;
+      ctx.fillRect(px, py, c, bevel);
+      ctx.fillRect(px, py, bevel, c);
+      ctx.fillStyle = s.dark;
+      ctx.fillRect(px, py + c - bevel, c, bevel);
+      ctx.fillRect(px + c - bevel, py, bevel, c);
+    }
+  }
+}
+
+/** The whole grid as one pixel per block, smoothed down to `c` pixels per block. */
+function drawImage(ctx: CanvasRenderingContext2D, { width: w, height: h, cells }: Grid, faceOf: (i: number) => string, c: number) {
+  const image = new ImageData(w, h);
+  const px = new Uint32Array(image.data.buffer);
+  const abgr = new Map<string, number>();
+  const pack = (hex: string) => {
+    let v = abgr.get(hex);
+    if (v === undefined) {
+      const [r, g, b] = rgb(hex);
+      // ImageData is RGBA bytes; on little-endian machines that reads back as ABGR.
+      v = ((255 << 24) | (b << 16) | (g << 8) | r) >>> 0;
+      abgr.set(hex, v);
+    }
+    return v;
+  };
+  const empty = pack(EMPTY_A);
+  for (let i = 0; i < cells.length; i++) px[i] = cells[i] ? pack(faceOf(i)) : empty;
+  const bitmap = new OffscreenCanvas(w, h);
+  bitmap.getContext("2d")!.putImageData(image, 0, 0);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(bitmap, 0, 0, w * c, h * c);
 }
 
 /** A block's bevel and label colours, derived from its face colour. */

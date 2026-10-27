@@ -6,8 +6,8 @@ export const ellipse = defineShape({
   name: "Ellipse",
   description: "Stretched circles for arenas and ponds.",
   params: [
-    { kind: "number", key: "width", label: "Width", min: 1, max: 255, default: 25, unit: "blocks" },
-    { kind: "number", key: "height", label: "Height", min: 1, max: 255, default: 15, unit: "blocks" },
+    { kind: "number", key: "width", label: "Width", min: 1, max: 1024, default: 25, unit: "blocks" },
+    { kind: "number", key: "height", label: "Height", min: 1, max: 1024, default: 15, unit: "blocks" },
   ],
   build({ width, height }) {
     const rx = width / 2;

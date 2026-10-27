@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import {
   eraserCells,
   lineEndpoints,
@@ -15,17 +15,17 @@ import {
 import { brushCells, rectCells, snapLine } from "../../composite/draw";
 import { insertLayer, layerBox, moveLayer, pickLayer, replaceLayer } from "../../composite/edit";
 import type { CompositeApi } from "../../composite/useComposite";
-import { drawGrid, MAX_CANVAS_PX } from "../../render/drawGrid";
+import { drawGrid } from "../../render/drawGrid";
 import type { Skin } from "../../render/skins";
+import { fitCanvas, visibleView } from "../../render/viewport";
 import { getShape } from "../../shapes";
 import type { CenterMarks } from "../../shapes/center";
 import { fillParams } from "../../shapes/fill";
-import type { Grid } from "../../shapes/grid";
+import type { Grid, Span } from "../../shapes/grid";
 import type { Highlight } from "../../shapes/patterns";
 import type { Point } from "../../shapes/raster";
 import { defaultValues } from "../../shapes/types";
-import { Label } from "@/components/ui/label";
-import { Slider } from "@/components/ui/slider";
+import { useStageZoom, ZoomControls } from "../StageZoom";
 import { Toggle } from "@/components/ui/toggle";
 import { cn } from "@/lib/utils";
 
@@ -36,6 +36,8 @@ interface Props {
   api: CompositeApi;
   /** The whole flattened canvas. */
   canvas: Grid;
+  /** Centre of the trimmed plan in canvas coordinates; null with no blocks. */
+  center: CenterMarks | null;
   skin: Skin;
   highlight: Highlight | null;
   /** Canvas row to highlight, from the row guide or the hover. */
@@ -68,45 +70,38 @@ const HOVER = "rgba(255, 246, 223, 0.6)";
  * overlay for the selection, line handles and tool previews. Move drags the
  * selected layer from anywhere; Ctrl/⌘-click picks the layer under the cursor.
  */
-export function CompositeStage({ api, canvas, skin, highlight, highlightRow, doneRows, onHover }: Props) {
+export function CompositeStage({ api, canvas, center, skin, highlight, highlightRow, doneRows, onHover }: Props) {
   const { composite, selected, tool, options } = api;
   const stageRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const baseRef = useRef<HTMLCanvasElement>(null);
   const overRef = useRef<HTMLCanvasElement>(null);
-  const stageSize = useElementSize(stageRef);
-  const [zoom, setZoom] = useState<number | null>(null);
   const [gridLines, setGridLines] = useState(true);
+  const [showCenter, setShowCenter] = useState(true);
   const [hover, setHover] = useState<Point | null>(null);
   const [rect, setRect] = useState<{ from: Point; to: Point; restore: boolean } | null>(null);
   const drag = useRef<Drag | null>(null);
 
   const { width, height } = composite.canvas;
-  const maxCell = Math.max(2, Math.min(48, Math.floor(MAX_CANVAS_PX / Math.max(width, height) / (window.devicePixelRatio || 1))));
-  const fitCell = Math.floor(
-    Math.min((stageSize.width - STAGE_PADDING * 2) / width, (stageSize.height - STAGE_PADDING * 2) / height),
-  );
-  const cell = Math.max(2, Math.min(maxCell, zoom ?? fitCell));
+  const zoom = useStageZoom(stageRef, contentRef, width, height, STAGE_PADDING);
+  const { cell } = zoom;
   const restoring = options.eraseMode === "restore" && selected?.kind === "eraser";
 
-  useLayoutEffect(() => {
-    if (!baseRef.current) return;
-    drawGrid(baseRef.current, canvas, {
-      cell, skin, gridLines, padding: 0, highlightRow, doneRows, center: NO_CENTER, showCenter: false, guides: [], highlight,
+  const drawBase = useCallback(() => {
+    const stage = stageRef.current, content = contentRef.current, el = baseRef.current;
+    if (!stage || !content || !el) return;
+    drawGrid(el, canvas, {
+      cell, skin, gridLines, padding: 0, highlightRow, doneRows, center: center ?? NO_CENTER, showCenter: showCenter && !!center,
+      guides: [], highlight, view: visibleView(stage, content),
     });
-  }, [canvas, cell, skin, gridLines, highlightRow, doneRows, highlight]);
+  }, [canvas, cell, skin, gridLines, highlightRow, doneRows, center, showCenter, highlight]);
+  useLayoutEffect(drawBase, [drawBase, zoom.stageSize]);
 
-  useLayoutEffect(() => {
-    const el = overRef.current;
-    const ctx = el?.getContext("2d");
-    if (!el || !ctx) return;
-    const dpr = window.devicePixelRatio || 1;
-    const w = width * cell, h = height * cell;
-    el.width = Math.round(w * dpr);
-    el.height = Math.round(h * dpr);
-    el.style.width = `${w}px`;
-    el.style.height = `${h}px`;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, w, h);
+  const drawOverlay = useCallback(() => {
+    const stage = stageRef.current, content = contentRef.current, el = overRef.current;
+    if (!stage || !content || !el) return;
+    const ctx = fitCanvas(el, visibleView(stage, content));
+    if (!ctx) return;
 
     if (selected?.kind === "eraser") {
       ctx.fillStyle = ERASED;
@@ -156,16 +151,17 @@ export function CompositeStage({ api, canvas, skin, highlight, highlightRow, don
       ctx.lineWidth = 1;
       ctx.strokeRect(hover.x * cell + 0.5, hover.y * cell + 0.5, cell - 1, cell - 1);
     }
-  }, [composite, width, height, cell, selected, tool, options, restoring, hover, rect, api.flashId]);
+  }, [composite, cell, selected, tool, options, restoring, hover, rect, api.flashId]);
+  useLayoutEffect(drawOverlay, [drawOverlay, zoom.stageSize]);
 
   const cellAt = (e: { clientX: number; clientY: number }): Point => {
-    const r = overRef.current!.getBoundingClientRect();
+    const r = contentRef.current!.getBoundingClientRect();
     return { x: Math.floor((e.clientX - r.left) / cell), y: Math.floor((e.clientY - r.top) / cell) };
   };
 
   /** Which endpoint of the selected line, if any, the pointer is on. */
   const handleAt = (e: { clientX: number; clientY: number }, line: LineLayer): "a" | "b" | null => {
-    const r = overRef.current!.getBoundingClientRect();
+    const r = contentRef.current!.getBoundingClientRect();
     const px = e.clientX - r.left, py = e.clientY - r.top;
     const reach = Math.max(handleRadius(cell), cell / 2) + 3;
     const [a, b] = lineEndpoints(line);
@@ -312,21 +308,21 @@ export function CompositeStage({ api, canvas, skin, highlight, highlightRow, don
   return (
     <div className="flex min-w-0 flex-col gap-2.5">
       <div className="flex flex-wrap items-center gap-2.5">
-        <Toggle variant="chip" pressed={zoom === null} onPressedChange={() => setZoom(null)}>
-          Fit
-        </Toggle>
-        <Label className="min-w-[180px] grow text-[13px] text-secondary-foreground">
-          Zoom
-          <Slider tone="diamond" min={2} max={maxCell} value={cell} onValueChange={v => setZoom(v as number)} />
-          <span className="min-w-[38px] text-right font-mono text-xs text-diamond">{cell}px</span>
-        </Label>
+        <ZoomControls zoom={zoom} />
         <Toggle variant="chip" pressed={gridLines} onPressedChange={setGridLines}>
           Grid lines
+        </Toggle>
+        <Toggle variant="chip" pressed={showCenter} onPressedChange={setShowCenter}>
+          Centre
         </Toggle>
       </div>
 
       <div
         ref={stageRef}
+        onScroll={() => {
+          drawBase();
+          drawOverlay();
+        }}
         onDragOver={e => {
           if (!e.dataTransfer.types.includes(SHAPE_TYPE)) return;
           e.preventDefault();
@@ -335,8 +331,12 @@ export function CompositeStage({ api, canvas, skin, highlight, highlightRow, don
         onDrop={onDrop}
         className="relative flex h-[min(68vh,760px)] min-h-80 overflow-auto rounded-md border-[3px] border-border bg-sky-deep p-5 shadow-[inset_0_0_0_2px_var(--shadow),5px_5px_0_var(--shadow)]"
       >
-        <div className="relative m-auto shrink-0 shadow-[0_0_0_3px_var(--shadow),0_12px_40px_rgba(0,0,0,0.45)]">
-          <canvas ref={baseRef} className="block [image-rendering:pixelated]" />
+        <div
+          ref={contentRef}
+          style={{ width: width * cell, height: height * cell }}
+          className="relative m-auto shrink-0 shadow-[0_0_0_3px_var(--shadow),0_12px_40px_rgba(0,0,0,0.45)]"
+        >
+          <canvas ref={baseRef} className="absolute [image-rendering:pixelated]" />
           <canvas
             ref={overRef}
             onPointerDown={onPointerDown}
@@ -347,7 +347,7 @@ export function CompositeStage({ api, canvas, skin, highlight, highlightRow, don
               setHover(null);
               onHover(null);
             }}
-            className={cn("absolute inset-0 touch-none", tool === "move" ? "cursor-move" : "cursor-crosshair")}
+            className={cn("absolute touch-none", tool === "move" ? "cursor-move" : "cursor-crosshair")}
           />
         </div>
         {!composite.layers.length && (
@@ -370,6 +370,12 @@ export function CompositeStage({ api, canvas, skin, highlight, highlightRow, don
         <span>
           Canvas {width} × {height}
         </span>
+        {center && (
+          <span>
+            Centre {center.x.length}×{center.y.length} · x <b className="font-mono text-gold">{spanText(center.x)}</b> · y{" "}
+            <b className="font-mono text-gold">{spanText(center.y)}</b>
+          </span>
+        )}
         {hover && hover.x >= 0 && hover.y >= 0 && hover.x < width && hover.y < height && (
           <span>
             x <b className="font-mono text-gold">{hover.x}</b> · y <b className="font-mono text-gold">{hover.y}</b>
@@ -389,6 +395,9 @@ function paintInto(c: Composite, id: string, cells: ReturnType<typeof brushCells
 
 const handleRadius = (cell: number) => Math.max(5, cell * 0.45);
 
+/** A span in the hover read-out's 0-based canvas coordinates, e.g. "63" or "63–64". */
+const spanText = (s: Span) => (s.length === 1 ? `${s.start}` : `${s.start}–${s.start + s.length - 1}`);
+
 function hint({ tool, selected, options }: CompositeApi): string {
   if (tool === "line") return "Drag to draw a line · Shift snaps to 0°, 45° or 90°";
   if (tool === "eraser") {
@@ -398,20 +407,4 @@ function hint({ tool, selected, options }: CompositeApi): string {
   if (selected?.kind === "line") return "Drag to move the line, or its yellow handles · Shift snaps · Ctrl-click picks a layer";
   if (selected) return `Drag to move "${selected.name}" · Ctrl-click picks a layer`;
   return "Ctrl-click a layer to pick it, or drag a shape in from the bar above";
-}
-
-function useElementSize(ref: React.RefObject<HTMLElement | null>) {
-  const [size, setSize] = useState({ width: 600, height: 500 });
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const observer = new ResizeObserver(([entry]) => {
-      if (!entry) return;
-      const { width, height } = entry.contentRect;
-      setSize({ width, height });
-    });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [ref]);
-  return size;
 }

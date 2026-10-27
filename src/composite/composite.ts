@@ -7,7 +7,7 @@ import { rasterLine } from "./draw";
 import { DEFAULT_IMAGE_VALUES, imageGrid, type ImageMask } from "./image";
 
 export const CANVAS_MIN = 8;
-export const CANVAS_MAX = 256;
+export const CANVAS_MAX = 1024;
 export const CANVAS_DEFAULT = 128;
 
 export interface Canvas {

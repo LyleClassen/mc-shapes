@@ -7,7 +7,7 @@ export const circle = defineShape({
   description: "Towers, fountains, dome layers.",
   tip: "Odd diameters have a single centre block; even ones centre on a corner.",
   params: [
-    { kind: "number", key: "diameter", label: "Diameter", min: 1, max: 255, default: 15, unit: "blocks" },
+    { kind: "number", key: "diameter", label: "Diameter", min: 1, max: 1024, default: 15, unit: "blocks" },
   ],
   build({ diameter }) {
     const r = diameter / 2;

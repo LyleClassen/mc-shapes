@@ -3,7 +3,8 @@ import { useCallback, useMemo, useState } from "react";
 import { flatten } from "../../composite/composite";
 import { useComposite } from "../../composite/useComposite";
 import { getSkin, SKINS } from "../../render/skins";
-import { countBlocks, type Grid } from "../../shapes/grid";
+import type { CenterMarks } from "../../shapes/center";
+import { centerSpan, countBlocks, type Grid } from "../../shapes/grid";
 import { highlight, highlightParam, type HighlightMode } from "../../shapes/patterns";
 import type { Point } from "../../shapes/raster";
 import { Panel } from "../Panel";
@@ -51,6 +52,12 @@ export function CompositeMode({ active, view }: { active: boolean; view: SharedV
   const hoverRow = hover && hover.y - origin.y >= 0 && hover.y - origin.y < grid.height ? hover.y - origin.y : null;
   const planRow = listRow ?? hoverRow;
   const canvasDone = useMemo(() => new Set([...doneRows].map(y => y + origin.y)), [doneRows, origin.y]);
+  // The centre of the trimmed plan, as in Shapes mode, moved into canvas coordinates.
+  const center = useMemo((): CenterMarks | null => {
+    if (!grid.width) return null;
+    const x = centerSpan(grid.width), y = centerSpan(grid.height);
+    return { x: { ...x, start: x.start + origin.x }, y: { ...y, start: y.start + origin.y }, straight: [] };
+  }, [grid, origin]);
 
   const toggleRow = useCallback(
     (row: number) =>
@@ -96,6 +103,7 @@ export function CompositeMode({ active, view }: { active: boolean; view: SharedV
           <CompositeStage
             api={api}
             canvas={flat.canvas}
+            center={center}
             skin={getSkin(view.skinId)}
             highlight={outline}
             highlightRow={planRow === null ? null : planRow + origin.y}

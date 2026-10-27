@@ -11,9 +11,9 @@ import {
   type SelectParam,
   type ToggleParam,
 } from "../shapes/types";
+import { NumberInput } from "./NumberInput";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -106,19 +106,7 @@ function NumberControl({
         <Button size="icon" aria-label={`Increase ${param.label}`} onClick={() => set(value + step)}>
           <PlusIcon />
         </Button>
-        <Input
-          id={id}
-          variant="readout"
-          type="number"
-          min={param.min}
-          max={max}
-          step={step}
-          value={value}
-          onChange={e => {
-            const v = e.target.valueAsNumber;
-            if (Number.isFinite(v)) set(v);
-          }}
-        />
+        <NumberInput id={id} variant="readout" min={param.min} max={max} step={step} value={value} onChange={set} />
       </div>
       <Hint param={param} values={values} />
     </Field>

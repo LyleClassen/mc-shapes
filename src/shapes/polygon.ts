@@ -30,7 +30,7 @@ export const polygon = defineShape({
       key: "diameter",
       label: "Diameter",
       min: 3,
-      max: 255,
+      max: 1024,
       default: 25,
       unit: "blocks",
       hint: v => {

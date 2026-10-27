@@ -169,9 +169,9 @@ describe("flatten", () => {
 });
 
 describe("canvas", () => {
-  test("defaults to 128×128 and clamps resizes into 8–256", () => {
+  test("defaults to 128×128 and clamps resizes into 8–1024", () => {
     expect(EMPTY_COMPOSITE.canvas).toEqual({ width: 128, height: 128 });
-    expect(resizeCanvas(EMPTY_COMPOSITE, { width: 2, height: 999 }).canvas).toEqual({ width: 8, height: 256 });
+    expect(resizeCanvas(EMPTY_COMPOSITE, { width: 2, height: 9999 }).canvas).toEqual({ width: 8, height: 1024 });
   });
 
   test("shrinking cuts blocks off, growing again brings them back", () => {
